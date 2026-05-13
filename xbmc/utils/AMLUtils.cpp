@@ -194,6 +194,8 @@ AML_SUPPORT_H264_4K2K aml_support_h264_4k2k()
       has_h264_4k2k = AML_HAS_H264_4K2K_SAME_PROFILE;
     else if (aml_support_vcodec_profile("\\bh264_4k2k\\b:"))
       has_h264_4k2k = AML_HAS_H264_4K2K;
+    else if (aml_support_vcodec_profile(":4k"))
+      has_h264_4k2k = AML_HAS_H264_4K2K_SAME_PROFILE;
   }
   return has_h264_4k2k;
 }
