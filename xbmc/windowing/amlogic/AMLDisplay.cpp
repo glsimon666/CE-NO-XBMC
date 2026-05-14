@@ -222,6 +222,9 @@ void CAMLDRMUtils::CleanAndClose()
 
   if (m_plane)
     drmModeFreePlane(m_plane);
+
+  if (m_sub_plane)
+    drmModeFreePlane(m_sub_plane);
 }
 
 void CAMLDRMUtils::aml_init_drmDevice()
@@ -274,16 +277,27 @@ void CAMLDRMUtils::aml_init_drmDevice()
 
   for (uint32_t i = 0; i < planeResources->count_planes; i++)
   {
-    m_plane = drmModeGetPlane(m_fd, planeResources->planes[i]);
+    drmModePlanePtr p = drmModeGetPlane(m_fd, planeResources->planes[i]);
 
-    if (m_plane == NULL)
+    if (p == NULL)
       continue;
 
-    if (get_drmProp(m_plane->plane_id, "type", DRM_MODE_OBJECT_PLANE) == DRM_PLANE_TYPE_PRIMARY)
-      break;
+    uint64_t planeType = get_drmProp(p->plane_id, "type", DRM_MODE_OBJECT_PLANE);
 
-    drmModeFreePlane(m_plane);
-    m_plane = NULL;
+    if (planeType == DRM_PLANE_TYPE_PRIMARY && !m_plane)
+    {
+      m_plane = p;
+    }
+    else if (planeType == DRM_PLANE_TYPE_OVERLAY && !m_sub_plane &&
+             (m_crtc_index < 0 || (p->possible_crtcs & (1 << m_crtc_index))) &&
+             SupportsFormat(p, DRM_FORMAT_XRGB8888))
+    {
+      m_sub_plane = p;
+    }
+    else
+    {
+      drmModeFreePlane(p);
+    }
   }
   drmModeFreePlaneResources(planeResources);
   if (!m_plane)
@@ -292,6 +306,10 @@ void CAMLDRMUtils::aml_init_drmDevice()
     CleanAndClose();
     throw std::runtime_error("failed to get primary plane of drmDevice");
   }
+  if (m_sub_plane)
+    CLog::Log(LOGINFO, "CAMLDRMUtils::{} - found overlay plane id {} for subtitles", __FUNCTION__, m_sub_plane->plane_id);
+  else
+    CLog::Log(LOGINFO, "CAMLDRMUtils::{} - no overlay plane available, subtitles will render on primary plane", __FUNCTION__);
 }
 
 void CAMLDRMUtils::aml_init_drmDevice_display()
@@ -337,7 +355,8 @@ void CAMLDRMUtils::aml_init_drmDevice_display()
 
     if (m_encoder->possible_crtcs & (1 << i) && m_crtc->crtc_id == m_encoder->crtc_id)
     {
-      CLog::Log(LOGDEBUG, "CAMLDRMUtils::{} - using crtc {}", __FUNCTION__, m_crtc->crtc_id);
+      m_crtc_index = i;
+      CLog::Log(LOGDEBUG, "CAMLDRMUtils::{} - using crtc {} (index {})", __FUNCTION__, m_crtc->crtc_id, i);
       break;
     }
     else
@@ -806,6 +825,53 @@ void CAMLDRMUtils::FlipPage(uint32_t fb_id, bool async)
 
   if (drmModeAtomicCommit(m_fd, req, async ? DRM_MODE_ATOMIC_NONBLOCK : 0, NULL))
     CLog::Log(LOGDEBUG, "CAMLDRMUtils::{} - failed to make drmDevice atomic commit", __FUNCTION__);
+
+  if (m_inFenceFd != -1)
+  {
+    close(m_inFenceFd);
+    m_inFenceFd = -1;
+  }
+
+  drmModeAtomicFree(req);
+}
+
+void CAMLDRMUtils::FlipPage(uint32_t gui_fb_id, uint32_t sub_fb_id, bool async)
+{
+  if (!aml_get_drmDevice_connected() || !m_sub_plane)
+    return;
+
+  drmModeAtomicReqPtr req = drmModeAtomicAlloc();
+
+  set_drmProp(m_plane->plane_id, "FB_ID", DRM_MODE_OBJECT_PLANE , gui_fb_id, req);
+  set_drmProp(m_plane->plane_id, "CRTC_ID", DRM_MODE_OBJECT_PLANE , m_crtc->crtc_id, req);
+  set_drmProp(m_plane->plane_id, "SRC_X", DRM_MODE_OBJECT_PLANE , 0, req);
+  set_drmProp(m_plane->plane_id, "SRC_Y", DRM_MODE_OBJECT_PLANE , 0, req);
+  set_drmProp(m_plane->plane_id, "SRC_W", DRM_MODE_OBJECT_PLANE , m_width << 16, req);
+  set_drmProp(m_plane->plane_id, "SRC_H", DRM_MODE_OBJECT_PLANE , m_height << 16, req);
+  set_drmProp(m_plane->plane_id, "CRTC_X", DRM_MODE_OBJECT_PLANE , 0, req);
+  set_drmProp(m_plane->plane_id, "CRTC_Y", DRM_MODE_OBJECT_PLANE , 0, req);
+  set_drmProp(m_plane->plane_id, "CRTC_W", DRM_MODE_OBJECT_PLANE , m_ScreenWidth, req);
+  set_drmProp(m_plane->plane_id, "CRTC_H", DRM_MODE_OBJECT_PLANE , m_ScreenHeight, req);
+
+  set_drmProp(m_sub_plane->plane_id, "FB_ID", DRM_MODE_OBJECT_PLANE , sub_fb_id, req);
+  set_drmProp(m_sub_plane->plane_id, "CRTC_ID", DRM_MODE_OBJECT_PLANE , m_crtc->crtc_id, req);
+  set_drmProp(m_sub_plane->plane_id, "SRC_X", DRM_MODE_OBJECT_PLANE , 0, req);
+  set_drmProp(m_sub_plane->plane_id, "SRC_Y", DRM_MODE_OBJECT_PLANE , 0, req);
+  set_drmProp(m_sub_plane->plane_id, "SRC_W", DRM_MODE_OBJECT_PLANE , m_width << 16, req);
+  set_drmProp(m_sub_plane->plane_id, "SRC_H", DRM_MODE_OBJECT_PLANE , m_height << 16, req);
+  set_drmProp(m_sub_plane->plane_id, "CRTC_X", DRM_MODE_OBJECT_PLANE , 0, req);
+  set_drmProp(m_sub_plane->plane_id, "CRTC_Y", DRM_MODE_OBJECT_PLANE , 0, req);
+  set_drmProp(m_sub_plane->plane_id, "CRTC_W", DRM_MODE_OBJECT_PLANE , m_ScreenWidth, req);
+  set_drmProp(m_sub_plane->plane_id, "CRTC_H", DRM_MODE_OBJECT_PLANE , m_ScreenHeight, req);
+
+  if (m_inFenceFd != -1)
+  {
+    set_drmProp(m_crtc->crtc_id, "OUT_FENCE_PTR", DRM_MODE_OBJECT_CRTC , reinterpret_cast<uint64_t>(&m_outFenceFd), req);
+    set_drmProp(m_plane->plane_id, "IN_FENCE_FD", DRM_MODE_OBJECT_PLANE , m_inFenceFd, req);
+  }
+
+  if (drmModeAtomicCommit(m_fd, req, async ? DRM_MODE_ATOMIC_NONBLOCK : 0, NULL))
+    CLog::Log(LOGDEBUG, "CAMLDRMUtils::{} - failed to make drmDevice dual-plane atomic commit", __FUNCTION__);
 
   if (m_inFenceFd != -1)
   {

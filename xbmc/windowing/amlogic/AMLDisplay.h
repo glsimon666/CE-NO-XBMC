@@ -29,6 +29,7 @@ public:
   struct gbm_surface *GetSurface() const { return m_surface.get(); }
   bool CreateSurface(int width, int height, uint32_t format);
   uint32_t GetFBId() { return m_drm_fb->fb_id; }
+  bool HasValidFB() const { return m_drm_fb != nullptr; }
   bool LockFrontBuffer(int fd);
 private:
   struct drm_fb* GetFBFromBo(int fd, struct gbm_bo* bo);
@@ -95,6 +96,8 @@ public:
   bool aml_set_drmDevice_active(std::string mode, bool active);
   bool aml_get_drmDevice_connected() const { return m_connection == DRM_MODE_CONNECTED; }
   void FlipPage(uint32_t fb_id, bool async);
+  bool HasSubPlane() const { return m_sub_plane != nullptr; }
+  void FlipPage(uint32_t gui_fb_id, uint32_t sub_fb_id, bool async);
 
   void SetInFenceFd(int fd) { m_inFenceFd = fd; }
   int TakeOutFenceFd()
@@ -125,6 +128,8 @@ private:
   drmModeCrtcPtr m_crtc{nullptr};
   drmModeCrtcPtr m_orig_crtc{nullptr};
   drmModePlanePtr m_plane{nullptr};
+  drmModePlanePtr m_sub_plane{nullptr};
+  int m_crtc_index{-1};
 
   int m_inFenceFd{-1};
   int m_outFenceFd{-1};
@@ -152,6 +157,8 @@ public:
   int aml_get_drmProperty(std::string name, unsigned int obj_type) const
     { return m_amlDRMUtils->aml_get_drmProperty(name, obj_type); }
   void FlipPage(uint32_t fb_id, bool async) { m_amlDRMUtils->FlipPage(fb_id, async); }
+  bool HasSubPlane() const { return m_amlDRMUtils->HasSubPlane(); }
+  void FlipPage(uint32_t gui_fb_id, uint32_t sub_fb_id, bool async) { m_amlDRMUtils->FlipPage(gui_fb_id, sub_fb_id, async); }
   bool aml_set_drmDevice_active(bool active) const
     { return m_amlDRMUtils->aml_set_drmDevice_active(m_amlDRMUtils->aml_get_drmDevice_mode(), active); }
 

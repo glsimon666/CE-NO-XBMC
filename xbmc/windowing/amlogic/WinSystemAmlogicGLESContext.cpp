@@ -219,6 +219,37 @@ bool CWinSystemAmlogicGLESContext::CreateNewWindow(const std::string& name,
       CLog::Log(LOGDEBUG, "CWinSystemAmlogicGLESContext::{} - failed to create CreatePlatformSurface", __FUNCTION__);
       return false;
     }
+
+    if (m_amlDisplay->HasSubPlane())
+    {
+      m_subGBMUtils = std::make_unique<CAMLGBMUtils>(m_amlDisplay->aml_get_Device_handle());
+      if (!m_subGBMUtils->CreateSurface(res.iWidth, res.iHeight, format))
+      {
+        CLog::Log(LOGWARNING, "CWinSystemAmlogicGLESContext::{} - failed to create sub GBM surface, falling back to single-plane", __FUNCTION__);
+        m_subGBMUtils.reset();
+      }
+      else
+      {
+        EGLint subSurfaceAttribs[] = {
+          EGL_RENDER_BUFFER, EGL_BACK_BUFFER,
+          EGL_NONE
+        };
+        m_subEGLSurface = eglCreateWindowSurface(
+            m_pGLContext->GetEGLDisplay(),
+            m_pGLContext->GetEGLConfig(),
+            reinterpret_cast<EGLNativeWindowType>(m_subGBMUtils->GetSurface()),
+            subSurfaceAttribs);
+        if (m_subEGLSurface == EGL_NO_SURFACE)
+        {
+          CLog::Log(LOGWARNING, "CWinSystemAmlogicGLESContext::{} - failed to create sub EGL surface: {:#x}", __FUNCTION__, eglGetError());
+          m_subGBMUtils.reset();
+        }
+        else
+        {
+          CLog::Log(LOGINFO, "CWinSystemAmlogicGLESContext::{} - subtitle plane surface created {}x{}", __FUNCTION__, res.iWidth, res.iHeight);
+        }
+      }
+    }
   }
   else
   {
@@ -252,6 +283,12 @@ bool CWinSystemAmlogicGLESContext::CreateNewWindow(const std::string& name,
 
 bool CWinSystemAmlogicGLESContext::DestroyWindow()
 {
+  if (m_subEGLSurface != EGL_NO_SURFACE)
+  {
+    eglDestroySurface(m_pGLContext->GetEGLDisplay(), m_subEGLSurface);
+    m_subEGLSurface = EGL_NO_SURFACE;
+  }
+  m_subGBMUtils.reset();
   m_pGLContext->DestroySurface();
   return CWinSystemAmlogic::DestroyWindow();
 }
@@ -312,7 +349,13 @@ void CWinSystemAmlogicGLESContext::PresentRender(bool rendered, bool videoLayer)
 #endif
 
     if (m_amlGBMUtils && m_amlGBMUtils->LockFrontBuffer(m_amlDisplay->aml_get_Device_handle()))
-      m_amlDisplay->FlipPage(m_amlGBMUtils->GetFBId(), async);
+    {
+      uint32_t sub_fb_id = HasSubSurface() ? GetSubFBId() : 0;
+      if (sub_fb_id)
+        m_amlDisplay->FlipPage(m_amlGBMUtils->GetFBId(), sub_fb_id, async);
+      else
+        m_amlDisplay->FlipPage(m_amlGBMUtils->GetFBId(), async);
+    }
   }
   else if (!rendered && !videoLayer)
   {
@@ -347,6 +390,46 @@ EGLContext CWinSystemAmlogicGLESContext::GetEGLContext() const
 EGLConfig  CWinSystemAmlogicGLESContext::GetEGLConfig() const
 {
   return m_pGLContext->GetEGLConfig();
+}
+
+void CWinSystemAmlogicGLESContext::BeginSubtitleRender()
+{
+  if (m_subEGLSurface == EGL_NO_SURFACE)
+    return;
+
+  EGLDisplay display = m_pGLContext->GetEGLDisplay();
+  EGLContext context = m_pGLContext->GetEGLContext();
+
+  eglMakeCurrent(display, m_subEGLSurface, m_subEGLSurface, context);
+
+  glViewport(0, 0, m_nWidth, m_nHeight);
+  glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+  glClear(GL_COLOR_BUFFER_BIT);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+}
+
+void CWinSystemAmlogicGLESContext::EndSubtitleRender()
+{
+  if (m_subEGLSurface == EGL_NO_SURFACE)
+    return;
+
+  CRenderSystemGLES* renderSystem =
+      dynamic_cast<CRenderSystemGLES*>(CServiceBroker::GetRenderSystem());
+  if (renderSystem)
+    renderSystem->ResetScissors();
+
+  eglSwapBuffers(m_pGLContext->GetEGLDisplay(), m_subEGLSurface);
+
+  if (!m_subGBMUtils->LockFrontBuffer(m_amlDisplay->aml_get_Device_handle()))
+    CLog::Log(LOGWARNING, "CWinSystemAmlogicGLESContext::{} - failed to lock sub front buffer", __FUNCTION__);
+
+  m_pGLContext->BindContext();
+}
+
+uint32_t CWinSystemAmlogicGLESContext::GetSubFBId() const
+{
+  return (m_subGBMUtils && m_subGBMUtils->HasValidFB()) ? m_subGBMUtils->GetFBId() : 0;
 }
 
 std::unique_ptr<CVideoSync> CWinSystemAmlogicGLESContext::GetVideoSync(CVideoReferenceClock *clock)

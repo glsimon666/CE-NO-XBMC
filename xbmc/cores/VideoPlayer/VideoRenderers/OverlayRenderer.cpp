@@ -143,6 +143,10 @@ void CRenderer::Render(int idx, float depth)
 {
   std::unique_lock lock(m_section);
 
+  auto winSystem = CServiceBroker::GetWinSystem();
+  if (winSystem && winSystem->HasSubSurface())
+    winSystem->BeginSubtitleRender();
+
   std::vector<SElement>& list = m_buffers[idx];
   for(std::vector<SElement>::iterator it = list.begin(); it != list.end(); ++it)
   {
@@ -154,6 +158,9 @@ void CRenderer::Render(int idx, float depth)
         Render(o.get());
     }
   }
+
+  if (winSystem && winSystem->HasSubSurface())
+    winSystem->EndSubtitleRender();
 
   ReleaseUnused();
 }

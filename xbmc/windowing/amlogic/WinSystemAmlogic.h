@@ -88,6 +88,7 @@ protected:
   bool m_nativeGUI;
   static std::unique_ptr<CAMLDisplay> m_amlDisplay;
   std::unique_ptr<CAMLGBMUtils> m_amlGBMUtils = nullptr;
+  std::unique_ptr<CAMLGBMUtils> m_subGBMUtils = nullptr;
   std::unique_ptr<KODI::UTILS::EGL::CEGLFence> m_eglFence;
 private:
   struct callback_data

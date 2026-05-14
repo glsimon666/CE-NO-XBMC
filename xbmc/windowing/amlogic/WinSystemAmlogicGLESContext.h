@@ -52,12 +52,18 @@ public:
   EGLSurface GetEGLSurface() const;
   EGLContext GetEGLContext() const;
   EGLConfig  GetEGLConfig() const;
+  bool HasSubSurface() const override { return m_subEGLSurface != EGL_NO_SURFACE; }
+  void BeginSubtitleRender() override;
+  void EndSubtitleRender() override;
+  EGLSurface GetSubEGLSurface() const { return m_subEGLSurface; }
+  uint32_t GetSubFBId() const;
 protected:
   void SetVSyncImpl(bool enable) override;
   void PresentRenderImpl(bool rendered) override {};
 
 private:
   std::unique_ptr<CEGLContextUtils> m_pGLContext;
+  EGLSurface m_subEGLSurface{EGL_NO_SURFACE};
   StreamHdrType m_hdrType = StreamHdrType::HDR_TYPE_NONE;
 };
 

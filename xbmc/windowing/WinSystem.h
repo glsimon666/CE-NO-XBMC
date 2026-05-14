@@ -226,6 +226,10 @@ public:
    */
   virtual bool SetVideoOutput(const VideoPicture* videoPicture) { return false; }
 
+  virtual bool HasSubSurface() const { return false; }
+  virtual void BeginSubtitleRender() {}
+  virtual void EndSubtitleRender() {}
+
   /*!
    * \brief Set the HDR metadata. Passing nullptr as the parameter should
    * disable HDR.
