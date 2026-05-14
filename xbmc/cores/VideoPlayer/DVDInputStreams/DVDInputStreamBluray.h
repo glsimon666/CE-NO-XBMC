@@ -193,6 +193,7 @@ protected:
   bool                m_bMVCDisabled = false;
   uint64_t            m_clipStartTime = 0;
   std::queue<int>     m_clipQueue;
+  uint16_t            m_currentPgPid{0};
 
   typedef std::shared_ptr<CDVDOverlayImage> SOverlay;
   typedef std::list<SOverlay> SOverlays;

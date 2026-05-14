@@ -863,6 +863,8 @@ void CAMLDRMUtils::FlipPage(uint32_t gui_fb_id, uint32_t sub_fb_id, bool async)
   set_drmProp(m_sub_plane->plane_id, "CRTC_Y", DRM_MODE_OBJECT_PLANE , 0, req);
   set_drmProp(m_sub_plane->plane_id, "CRTC_W", DRM_MODE_OBJECT_PLANE , m_ScreenWidth, req);
   set_drmProp(m_sub_plane->plane_id, "CRTC_H", DRM_MODE_OBJECT_PLANE , m_ScreenHeight, req);
+  set_drmProp(m_sub_plane->plane_id, "pixel blend mode", DRM_MODE_OBJECT_PLANE, 1, req);
+  set_drmProp(m_sub_plane->plane_id, "alpha", DRM_MODE_OBJECT_PLANE, 0xffff, req);
 
   if (m_inFenceFd != -1)
   {

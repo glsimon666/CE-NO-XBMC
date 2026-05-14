@@ -8,6 +8,7 @@
 
 #include "VideoSyncAML.h"
 #include "WinSystemAmlogicGLESContext.h"
+#include <drm_fourcc.h>
 #include "platform/linux/SysfsPath.h"
 #include "ServiceBroker.h"
 #include "settings/Settings.h"
@@ -223,7 +224,7 @@ bool CWinSystemAmlogicGLESContext::CreateNewWindow(const std::string& name,
     if (m_amlDisplay->HasSubPlane())
     {
       m_subGBMUtils = std::make_unique<CAMLGBMUtils>(m_amlDisplay->aml_get_Device_handle());
-      if (!m_subGBMUtils->CreateSurface(res.iWidth, res.iHeight, format))
+      if (!m_subGBMUtils->CreateSurface(res.iWidth, res.iHeight, DRM_FORMAT_ARGB8888))
       {
         CLog::Log(LOGWARNING, "CWinSystemAmlogicGLESContext::{} - failed to create sub GBM surface, falling back to single-plane", __FUNCTION__);
         m_subGBMUtils.reset();
@@ -246,7 +247,7 @@ bool CWinSystemAmlogicGLESContext::CreateNewWindow(const std::string& name,
         }
         else
         {
-          CLog::Log(LOGINFO, "CWinSystemAmlogicGLESContext::{} - subtitle plane surface created {}x{}", __FUNCTION__, res.iWidth, res.iHeight);
+          CLog::Log(LOGINFO, "CWinSystemAmlogicGLESContext::{} - subtitle plane surface created {}x{} ARGB8888", __FUNCTION__, res.iWidth, res.iHeight);
         }
       }
     }
