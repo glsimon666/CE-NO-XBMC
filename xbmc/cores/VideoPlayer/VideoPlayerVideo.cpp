@@ -526,6 +526,8 @@ void CVideoPlayerVideo::Process()
         m_renderManager.ShowVideo(false);
       }
 
+      m_renderManager.ResetSkippedFrames();
+      m_iDroppedFrames = 0;
       m_renderManager.DiscardBuffer();
       FlushMessages();
     }

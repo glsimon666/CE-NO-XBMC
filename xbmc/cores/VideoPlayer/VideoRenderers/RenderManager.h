@@ -95,6 +95,7 @@ public:
   bool Supports(ESCALINGMETHOD method) const;
 
   int GetSkippedFrames()  { return m_QueueSkip; }
+  void ResetSkippedFrames() { m_QueueSkip = 0; }
   void DisplayReset() { m_displayReset = true; }
 
   bool Configure(const VideoPicture& picture, float fps, unsigned int orientation, int buffers = 0);
