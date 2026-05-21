@@ -10,6 +10,7 @@
 
 #include <string.h>
 #include <float.h>
+#include <algorithm>
 
 #include "ServiceBroker.h"
 #include "cores/RetroPlayer/process/amlogic/RPProcessInfoAmlogic.h"
@@ -468,6 +469,14 @@ float CWinSystemAmlogic::GetGuiSdrPeakLuminance() const
   const int guiSdrPeak = settings->GetInt(CSettings::SETTING_VIDEOSCREEN_GUISDRPEAKLUMINANCE);
 
   return ((0.7f * guiSdrPeak + 30.0f) / 100.0f);
+}
+
+float CWinSystemAmlogic::GetGuiSdrSaturation() const
+{
+  const auto settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+  const int satClamped = std::clamp(settings->GetInt(CSettings::SETTING_VIDEOSCREEN_GUISDRSATURATION), 0, 100);
+  float saturation = static_cast<float>(satClamped) / 50.0f;
+  return std::clamp(saturation, 0.0f, 2.0f);
 }
 
 HDR_STATUS CWinSystemAmlogic::GetOSHDRStatus()
