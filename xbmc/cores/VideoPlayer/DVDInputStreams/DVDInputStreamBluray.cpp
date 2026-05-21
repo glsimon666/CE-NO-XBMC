@@ -586,10 +586,7 @@ void CDVDInputStreamBluray::ProcessEvent() {
   case BD_EVENT_PG_TEXTST_STREAM:
     pid = -1;
     if (m_titleInfo && m_clip && static_cast<uint32_t>(m_clip->pg_stream_count) > (m_event.param - 1))
-    {
       pid = m_clip->pg_streams[m_event.param - 1].pid;
-      m_currentPgPid = static_cast<uint16_t>(pid);
-    }
     CLog::Log(LOGDEBUG, "CDVDInputStreamBluray - BD_EVENT_PG_TEXTST_STREAM {}, {}", m_event.param,
               pid);
     m_player->OnDiscNavResult(static_cast<void*>(&pid), BD_EVENT_PG_TEXTST_STREAM);
@@ -755,12 +752,7 @@ static uint8_t  clamp(double v)
   return (v) > 255.0 ? 255 : ((v) < 0.0 ? 0 : static_cast<uint32_t>((v + 0.5)));
 }
 
-static bool pg_pid_is_hdr(uint16_t pid)
-{
-  return (HDMV_PID_PG_HDR_FIRST <= pid && pid <= HDMV_PID_PG_HDR_LAST);
-}
-
-static uint32_t build_rgba_bt601(const BD_PG_PALETTE_ENTRY &e)
+static uint32_t build_rgba(const BD_PG_PALETTE_ENTRY &e)
 {
   double r = 1.164 * (e.Y - 16)                        + 1.596 * (e.Cr - 128);
   double g = 1.164 * (e.Y - 16) - 0.391 * (e.Cb - 128) - 0.813 * (e.Cr - 128);
@@ -769,28 +761,6 @@ static uint32_t build_rgba_bt601(const BD_PG_PALETTE_ENTRY &e)
        | static_cast<uint32_t>(clamp(r)) << PIXEL_RSHIFT
        | static_cast<uint32_t>(clamp(g)) << PIXEL_GSHIFT
        | static_cast<uint32_t>(clamp(b)) << PIXEL_BSHIFT;
-}
-
-static uint32_t build_rgba_bt2020(const BD_PG_PALETTE_ENTRY &e)
-{
-  double y  = e.Y  - 16.0;
-  double cb = e.Cb - 128.0;
-  double cr = e.Cr - 128.0;
-  double r = 1.16438 * y + 1.67862 * cr;
-  double g = 1.16438 * y - 0.18726 * cb - 0.65006 * cr;
-  double b = 1.16438 * y + 2.14106 * cb;
-  return static_cast<uint32_t>(e.T)      << PIXEL_ASHIFT
-       | static_cast<uint32_t>(clamp(r)) << PIXEL_RSHIFT
-       | static_cast<uint32_t>(clamp(g)) << PIXEL_GSHIFT
-       | static_cast<uint32_t>(clamp(b)) << PIXEL_BSHIFT;
-}
-
-static uint32_t build_rgba(const BD_PG_PALETTE_ENTRY &e, bool is_hdr)
-{
-  if (is_hdr)
-    return build_rgba_bt2020(e);
-  else
-    return build_rgba_bt601(e);
 }
 
 void CDVDInputStreamBluray::OverlayClose()
@@ -911,11 +881,10 @@ void CDVDInputStreamBluray::OverlayCallback(const BD_OVERLAY * const ov)
 
     if (ov->palette)
     {
-      bool is_hdr = pg_pid_is_hdr(m_currentPgPid);
       overlay->palette.resize(256);
 
       for(unsigned i = 0; i < 256; i++)
-        overlay->palette[i] = build_rgba(ov->palette[i], is_hdr);
+        overlay->palette[i] = build_rgba(ov->palette[i]);
     }
     else
       overlay->palette.clear();
