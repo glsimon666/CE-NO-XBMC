@@ -506,10 +506,14 @@ bool CDVDVideoCodecAmlogic::AddData(const DemuxPacket &packet)
 
       m_opened = true;
 
-      // DV bypass: let amdolby_vision kernel module handle OSD luminance in PQ space
-      CSysfsPath dv_graphic_max{"/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max"};
-      if (dv_graphic_max.Exists())
-        dv_graphic_max.Set(0);
+      // DV/HDR bypass: let amdolby_vision kernel module handle OSD luminance in PQ space
+      bool is_hdr = (m_hints.hdrType != StreamHdrType::HDR_TYPE_NONE || dovi_el_type != ELType::TYPE_NONE);
+      if (is_hdr)
+      {
+        CSysfsPath dv_graphic_max{"/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max"};
+        if (dv_graphic_max.Exists())
+          dv_graphic_max.Set(0);
+      }
     }
   }
 
