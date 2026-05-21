@@ -14,6 +14,7 @@
 #include "cores/VideoPlayer/Interface/TimingConstants.h"
 #include "DVDStreamInfo.h"
 #include "AMLCodec.h"
+#include "platform/linux/SysfsPath.h"
 #include "ServiceBroker.h"
 #include "utils/AMLUtils.h"
 #include "utils/log.h"
@@ -504,6 +505,11 @@ bool CDVDVideoCodecAmlogic::AddData(const DemuxPacket &packet)
       m_videoBufferPool = std::shared_ptr<CAMLVideoBufferPool>(new CAMLVideoBufferPool());
 
       m_opened = true;
+
+      // DV bypass: let amdolby_vision kernel module handle OSD luminance in PQ space
+      CSysfsPath dv_graphic_max{"/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max"};
+      if (dv_graphic_max.Exists())
+        dv_graphic_max.Set(0);
     }
   }
 
