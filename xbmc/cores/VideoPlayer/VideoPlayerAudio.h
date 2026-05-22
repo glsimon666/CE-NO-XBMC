@@ -9,6 +9,7 @@
 #pragma once
 
 #include "AudioSinkAE.h"
+#include "AVSyncController.h"
 #include "DVDClock.h"
 #include "DVDMessageQueue.h"
 #include "DVDStreamInfo.h"
@@ -94,6 +95,7 @@ protected:
   CDVDClock* m_pClock; // dvd master clock
   std::unique_ptr<CDVDAudioCodec> m_pAudioCodec; // audio codec
   BitstreamStats m_audioStats;
+  CAVSyncController m_avSyncController; // unified A/V sync
 
   int m_speed;
   bool m_stalled;

@@ -8,12 +8,15 @@
  *  LAV A/V sync improvements based on LAV Filters by Hendrik Leppkes (Nevcairiel)
  *  https://github.com/Nevcairiel/LAVFilters
  *  (enabled via m_lavStyleSyncEnabled flag)
+ *
+ *  v2: Replaced CFloatingAverage<T,N> with CAdaptiveJitterFilter (EWMA+drift)
+ *      Better convergence, drift compensation, and confidence gating.
  */
 
 #pragma once
 
 #include "DVDAudioCodec.h"
-#include "FloatingAverage.h"
+#include "AdaptiveJitterFilter.h"
 #include "cores/AudioEngine/Utils/AEAudioFormat.h"
 #include "cores/AudioEngine/Utils/AEBitstreamPacker.h"
 #include "cores/AudioEngine/Utils/AEStreamInfo.h"
@@ -81,12 +84,13 @@ private:
   double m_truehd_ptsCache{LOCAL_NOPTS};
   bool m_truehd_ptsCacheValid{false};
 
-  static constexpr size_t JITTER_WINDOW_SIZE = 256;
-  AudioSync::CFloatingAverage<double, JITTER_WINDOW_SIZE> m_jitterTracker;
+  AudioSync::CAdaptiveJitterFilter m_jitterTracker;
 
   static constexpr double JITTER_THRESHOLD_TRUEHD_DTS = 100000.0;
   static constexpr double JITTER_THRESHOLD_DEFAULT = 10000.0;
   double m_jitterThreshold{JITTER_THRESHOLD_DEFAULT};
+
+  static constexpr double CONFIDENCE_THRESHOLD = 0.55;
 
   double m_internalClock{LOCAL_NOPTS};
   bool m_needsResync{true};

@@ -371,6 +371,7 @@ void CDVDAudioCodecPassthrough::GetData(DVDAudioFrame &frame)
       m_internalClock = demuxerPts;
       m_needsResync = false;
       m_jitterTracker.Reset();
+      m_jitterTracker.ForceConverged();
 
       CLog::Log(LOGDEBUG, "CDVDAudioCodecPassthrough: Internal clock synced to demuxer PTS {:.3f}s",
                 demuxerPts / DVD_TIME_BASE);
@@ -379,22 +380,32 @@ void CDVDAudioCodecPassthrough::GetData(DVDAudioFrame &frame)
     if (IsValidPts(m_internalClock) && haveDemuxerPts)
     {
       double jitter = m_internalClock - demuxerPts + samplesOffsetTime;
-      m_jitterTracker.Sample(jitter);
+      double dt = frame.duration / DVD_TIME_BASE;
 
-      double absMinJitter = m_jitterTracker.AbsMinimum();
+      m_jitterTracker.Sample(jitter, dt);
 
-      if (std::abs(absMinJitter) > m_jitterThreshold)
+      if (m_jitterTracker.Confidence() > CONFIDENCE_THRESHOLD)
       {
-        m_internalClock -= absMinJitter;
-        m_jitterTracker.OffsetValues(-absMinJitter);
+        double predicted = m_jitterTracker.Predict(dt);
+        double driftComp = m_jitterTracker.Drift() * dt;
+        double corrected = predicted + driftComp;
 
-        frame.hasDiscontinuity = true;
-        frame.discontinuityCorrection = absMinJitter;
+        if (std::abs(corrected) > m_jitterThreshold)
+        {
+          m_internalClock -= corrected;
 
-        CLog::Log(LOGDEBUG,
-                  "CDVDAudioCodecPassthrough: Jitter correction {:.2f}ms (threshold {:.0f}ms)",
-                  absMinJitter / 1000.0,
-                  m_jitterThreshold / 1000.0);
+          frame.hasDiscontinuity = true;
+          frame.discontinuityCorrection = corrected;
+
+          CLog::Log(LOGDEBUG,
+                    "CDVDAudioCodecPassthrough: Jitter correction {:.2f}ms "
+                    "(pred {:.2f} drift {:.2f} conf {:.2f} thresh {:.0f}ms)",
+                    corrected / 1000.0,
+                    predicted / 1000.0,
+                    driftComp / 1000.0,
+                    m_jitterTracker.Confidence(),
+                    m_jitterThreshold / 1000.0);
+        }
       }
     }
 

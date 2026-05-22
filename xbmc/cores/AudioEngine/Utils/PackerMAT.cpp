@@ -86,28 +86,93 @@ bool CPackerMAT::PackTrueHD(const uint8_t* data, int size)
 
   if (info.outputTimingPresent)
   {
-    if (m_lavStyleEnabled && m_state.outputTimingValid && (info.outputTiming != m_state.outputTiming))
+    if (m_lavStyleEnabled && m_state.outputTimingValid &&
+        (info.outputTiming != m_state.outputTiming))
     {
-      CLog::Log(LOGDEBUG, "CPackerMAT::PackTrueHD: detected stream discontinuity "
-                "(seamless branch), expected outputTiming={}, actual={}",
-                m_state.outputTiming, info.outputTiming);
+      const uint32_t delta = static_cast<uint32_t>(
+          std::abs(static_cast<int32_t>(info.outputTiming - m_state.outputTiming)));
 
-      m_state.prevFrametimeValid = false;
-      spaceSize = 40 * (64 >> (m_state.ratebits & 7));
+      /*
+       * Two-stage branch confirmation:
+       *
+       * Stage 1: outputTiming jumped.  Record it but do not act yet.
+       *           Single-bit errors in the HDMI or parsing path can
+       *           produce spurious jumps — we avoid false positives by
+       *           waiting for a second confirmation frame.
+       *
+       * Stage 2: next frame's outputTiming resumes cleanly at
+       *           (old_outputTiming + frameSamples * N).
+       *           If confirmed, we have a genuine seamless branch.
+       *
+       * Threshold: the jump must exceed 2 * frameSamples (one complete
+       * MAT packet duration).  Smaller delta is treated as jitter.
+       */
+      if (delta > frameSamples * 2)
+      {
+        if (!m_state.branchCheckPending)
+        {
+          /* Stage 1: flag as suspicious, store for confirmation */
+          m_state.branchCheckPending = true;
+          m_state.branchCheckDelta = delta;
+          CLog::Log(LOGDEBUG,
+                    "CPackerMAT::PackTrueHD: potential seamless branch (pending), "
+                    "expected outputTiming={}, actual={}, delta={}",
+                    m_state.outputTiming, info.outputTiming, delta);
+        }
+        else
+        {
+          /* Stage 2: second consecutive jump → confirmed */
+          m_state.branchConfirmed = true;
+          m_state.branchCheckPending = false;
+          CLog::Log(LOGDEBUG,
+                    "CPackerMAT::PackTrueHD: seamless branch CONFIRMED "
+                    "(2nd frame), delta={} → {}",
+                    m_state.branchCheckDelta, delta);
 
-      uint32_t prevOutput = static_cast<uint16_t>(info.outputTiming - frameSamples);
-      if (prevOutput < frameTime)
-        prevOutput += UINT16_MAX;
+          m_state.prevFrametimeValid = false;
+          spaceSize = 40 * (64 >> (m_state.ratebits & 7));
 
-      int32_t currentFrameOutputOffset = static_cast<int32_t>(prevOutput - frameTime);
+          uint32_t prevOutput = static_cast<uint16_t>(info.outputTiming - frameSamples);
+          if (prevOutput < frameTime)
+            prevOutput += UINT16_MAX;
 
-      if (m_state.nOutputTimeOffset >= currentFrameOutputOffset)
-        m_state.padding += (m_state.nOutputTimeOffset - currentFrameOutputOffset) * static_cast<int32_t>(64 >> (m_state.ratebits & 7));
+          int32_t currentFrameOutputOffset =
+              static_cast<int32_t>(prevOutput - frameTime);
 
-      CLog::Log(LOGDEBUG, "CPackerMAT::PackTrueHD: carrying forward {} padding (offset {} - {})",
-                m_state.padding, m_state.nOutputTimeOffset, currentFrameOutputOffset);
+          if (m_state.nOutputTimeOffset >= currentFrameOutputOffset)
+            m_state.padding += (m_state.nOutputTimeOffset - currentFrameOutputOffset) *
+                               static_cast<int32_t>(64 >> (m_state.ratebits & 7));
 
-      m_pendingDiscontinuity = true;
+          CLog::Log(LOGDEBUG,
+                    "CPackerMAT::PackTrueHD: carrying forward {} padding "
+                    "(offset {} - {})",
+                    m_state.padding, m_state.nOutputTimeOffset,
+                    currentFrameOutputOffset);
+
+          m_pendingDiscontinuity = true;
+        }
+      }
+      else
+      {
+        /* Small delta: jitter or minor clock drift — no branch */
+        CLog::Log(LOGDEBUG,
+                  "CPackerMAT::PackTrueHD: minor timing delta {} "
+                  "(< threshold {}), ignored",
+                  delta, frameSamples * 2);
+      }
+    }
+    else if (m_state.branchCheckPending)
+    {
+      /*
+       * No jump on this frame after a pending branch was flagged.
+       * Either the first frame was a false positive (single-bit error),
+       * or the second frame has caught up. Clear the pending flag.
+       */
+      CLog::Log(LOGDEBUG,
+                "CPackerMAT::PackTrueHD: branch check pending cleared "
+                "(no second jump)");
+      m_state.branchCheckPending = false;
+      m_state.branchCheckDelta = 0;
     }
     m_state.outputTiming = info.outputTiming;
     m_state.outputTimingValid = true;

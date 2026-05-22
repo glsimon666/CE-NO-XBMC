@@ -144,6 +144,19 @@ void CVideoPlayerAudio::OpenStream(CDVDStreamInfo& hints, std::unique_ptr<CDVDAu
     }
   }
 
+  // Unified AV Sync Controller: initialise with kernel driver
+  {
+    AVSyncPlaybackMode avMode = m_pAudioCodec->NeedPassthrough()
+        ? AVS_MODE_PASSTHROUGH : AVS_MODE_PCM;
+    double fps = 0.0;
+    if (m_processInfo.GetVideoSettings().m_VideoFrameRate > 0)
+      fps = m_processInfo.GetVideoSettings().m_VideoFrameRate;
+    m_avSyncController.Open(avMode, fps,
+                            static_cast<uint32_t>(m_streaminfo.samplerate),
+                            0);
+    CLog::Log(LOGDEBUG, "CVideoPlayerAudio::OpenStream - AVSyncController "
+              "initialised, mode={}", static_cast<int>(avMode));
+  }
 
   /* store our stream hints */
   m_streaminfo = hints;
@@ -381,6 +394,7 @@ void CVideoPlayerAudio::Process()
           ptCodec->SyncToResyncPts(pts);
         }
       }
+      m_avSyncController.NotifyResume();
     }
     else if (pMsg->IsType(CDVDMsg::GENERAL_RESET))
     {
@@ -391,6 +405,7 @@ void CVideoPlayerAudio::Process()
       m_audioClock = 0;
       audioframe.nb_frames = 0;
       m_syncState = IDVDStreamPlayer::SYNC_STARTING;
+      m_avSyncController.NotifyFlush();
     }
     else if (pMsg->IsType(CDVDMsg::GENERAL_FLUSH))
     {
@@ -408,8 +423,8 @@ void CVideoPlayerAudio::Process()
 
       if (m_pAudioCodec)
         m_pAudioCodec->Reset();
+      m_avSyncController.NotifyFlush();
     }
-    else if (pMsg->IsType(CDVDMsg::GENERAL_EOF))
     {
       CLog::Log(LOGDEBUG, "CVideoPlayerAudio - CDVDMsg::GENERAL_EOF");
     }
@@ -445,6 +460,10 @@ void CVideoPlayerAudio::Process()
     {
       m_paused = std::static_pointer_cast<CDVDMsgBool>(pMsg)->m_value;
       CLog::Log(LOGDEBUG, "CVideoPlayerAudio - CDVDMsg::GENERAL_PAUSE: {}", m_paused);
+      if (m_paused)
+        m_avSyncController.NotifyPause();
+      else
+        m_avSyncController.NotifyResume();
     }
     else if (pMsg->IsType(CDVDMsg::PLAYER_REQUEST_STATE))
     {
@@ -573,6 +592,15 @@ bool CVideoPlayerAudio::ProcessDecoderOutput(DVDAudioFrame &audioframe)
 
     SetSyncType(audioframe.passthrough);
 
+    // Push audio PTS to unified A/V sync controller (kernel driver)
+    if (m_avSyncController.IsOpen() && audioframe.hasTimestamp)
+    {
+      double pts90k = audioframe.pts / DVD_TIME_BASE * 90000.0;
+      double delay90k = m_audioSink.GetDelay() * 90000.0;
+      m_avSyncController.PushAudioPts(pts90k, delay90k,
+                                       audioframe.hasDiscontinuity);
+    }
+
     // downmix
     double clev = audioframe.hasDownmix ? audioframe.centerMixLevel : M_SQRT1_2;
     double curDB = 20 * log10(clev);
@@ -663,6 +691,7 @@ void CVideoPlayerAudio::SetSyncType(bool passthrough)
 
 void CVideoPlayerAudio::OnExit()
 {
+  m_avSyncController.Close();
 #ifdef TARGET_WINDOWS
   CoUninitialize();
 #endif

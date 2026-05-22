@@ -62,6 +62,11 @@ private:
     uint32_t samples;
     int32_t numberOfSamplesOffset;
     int32_t nOutputTimeOffset;
+
+    /* Two-stage seamless branch confirmation */
+    bool     branchCheckPending{false};
+    uint32_t branchCheckDelta{0};
+    bool     branchConfirmed{false};
   };
 
   void WriteHeader();

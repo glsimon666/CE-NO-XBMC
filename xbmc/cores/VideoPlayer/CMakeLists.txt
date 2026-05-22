@@ -1,4 +1,5 @@
 set(SOURCES AudioSinkAE.cpp
+            AVSyncController.cpp
             DVDClock.cpp
             DVDDemuxSPU.cpp
             DVDFileInfo.cpp
@@ -24,6 +25,7 @@ set(SOURCES AudioSinkAE.cpp
             VideoReferenceClock.cpp)
 
 set(HEADERS AudioSinkAE.h
+            AVSyncController.h
             DVDClock.h
             DVDDemuxSPU.h
             DVDFileInfo.h
