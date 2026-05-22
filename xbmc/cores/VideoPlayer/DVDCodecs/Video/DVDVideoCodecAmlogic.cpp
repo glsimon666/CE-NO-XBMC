@@ -510,9 +510,14 @@ bool CDVDVideoCodecAmlogic::AddData(const DemuxPacket &packet)
       bool is_hdr = (m_hints.hdrType != StreamHdrType::HDR_TYPE_NONE || dovi_el_type != ELType::TYPE_NONE);
       if (is_hdr)
       {
-        CSysfsPath dv_graphic_max{"/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max"};
-        if (dv_graphic_max.Exists())
-          dv_graphic_max.Set(0);
+        // CPM kernel: /sys/module/amdolby_vision/parameters/dolby_vision_graphic_max
+        // Amlogic kernel: /sys/module/amdolby_vision/parameters/amdv_graphic_max
+        CSysfsPath dv_graphic_max_cpm{"/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max"};
+        CSysfsPath dv_graphic_max_aml{"/sys/module/amdolby_vision/parameters/amdv_graphic_max"};
+        if (dv_graphic_max_cpm.Exists())
+          dv_graphic_max_cpm.Set(0);
+        else if (dv_graphic_max_aml.Exists())
+          dv_graphic_max_aml.Set(0);
       }
     }
   }
