@@ -229,6 +229,7 @@ public:
   virtual bool HasSubSurface() const { return false; }
   virtual void BeginSubtitleRender() {}
   virtual void EndSubtitleRender() {}
+  virtual void ClearSubFBId() {}
 
   /*!
    * \brief Set the HDR metadata. Passing nullptr as the parameter should

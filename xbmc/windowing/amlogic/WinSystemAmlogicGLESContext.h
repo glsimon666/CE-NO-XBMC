@@ -55,6 +55,7 @@ public:
   bool HasSubSurface() const override { return m_subEGLSurface != EGL_NO_SURFACE; }
   void BeginSubtitleRender() override;
   void EndSubtitleRender() override;
+  void ClearSubFBId() override;
   EGLSurface GetSubEGLSurface() const { return m_subEGLSurface; }
   uint32_t GetSubFBId() const;
 protected:

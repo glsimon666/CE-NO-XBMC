@@ -433,6 +433,11 @@ uint32_t CWinSystemAmlogicGLESContext::GetSubFBId() const
   return (m_subGBMUtils && m_subGBMUtils->HasValidFB()) ? m_subGBMUtils->GetFBId() : 0;
 }
 
+void CWinSystemAmlogicGLESContext::ClearSubFBId()
+{
+  m_subFBId = 0;
+}
+
 std::unique_ptr<CVideoSync> CWinSystemAmlogicGLESContext::GetVideoSync(CVideoReferenceClock *clock)
 {
   std::unique_ptr<CVideoSync> pVSync(new CVideoSyncAML(clock));

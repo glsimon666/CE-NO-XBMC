@@ -158,6 +158,10 @@ void CRenderer::Render(int idx, float depth)
         Render(o.get());
     }
   }
+  else if (winSystem && winSystem->HasSubSurface())
+  {
+    winSystem->ClearSubFBId();
+  }
 
   if (winSystem && winSystem->HasSubSurface())
     winSystem->EndSubtitleRender();
