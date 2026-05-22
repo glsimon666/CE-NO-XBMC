@@ -1257,6 +1257,65 @@ DemuxPacket* CDVDDemuxFFmpeg::Read()
   return ReadInternal(false);
 }
 
+int CDVDDemuxFFmpeg::FindKeyFrameStreamIndex() const
+{
+  // Prefer video stream, then any stream with index entries
+  int videoStreamIdx = -1;
+  int bestStreamIdx = -1;
+  int bestNbIndexEntries = 0;
+
+  for (unsigned int i = 0; i < m_pFormatContext->nb_streams; i++)
+  {
+    AVStream* st = m_pFormatContext->streams[i];
+    if (st->codecpar->codec_type == AVMEDIA_TYPE_VIDEO && videoStreamIdx < 0)
+      videoStreamIdx = i;
+    if (st->nb_index_entries > bestNbIndexEntries)
+    {
+      bestNbIndexEntries = st->nb_index_entries;
+      bestStreamIdx = i;
+    }
+  }
+
+  if (videoStreamIdx >= 0 && m_pFormatContext->streams[videoStreamIdx]->nb_index_entries > 0)
+    return videoStreamIdx;
+  if (bestStreamIdx >= 0)
+    return bestStreamIdx;
+  return -1;
+}
+
+std::pair<int64_t, int64_t> CDVDDemuxFFmpeg::GetNearestPrevKeyFramePos(int streamIdx, int64_t targetPts) const
+{
+  // Returns {keyframe_pts_in_stream_timebase, keyframe_pts_in_av_timebase}
+  AVStream* st = m_pFormatContext->streams[streamIdx];
+
+  // Use avformat_seek_file's internal logic: search the index for nearest keyframe <= targetPts
+  // We use av_index_search_timestamp which finds the nearest index entry <= timestamp
+  int idx = av_index_search_timestamp(st, targetPts, AVSEEK_FLAG_BACKWARD);
+  if (idx < 0 || idx >= st->nb_index_entries)
+    return {AV_NOPTS_VALUE, AV_NOPTS_VALUE};
+
+  AVIndexEntry& entry = st->index_entries[idx];
+  if (!(entry.flags & AVINDEX_KEYFRAME))
+  {
+    // Not a keyframe - search backward for one
+    for (int i = idx; i >= 0; i--)
+    {
+      if (st->index_entries[i].flags & AVINDEX_KEYFRAME)
+      {
+        idx = i;
+        break;
+      }
+    }
+    if (!(st->index_entries[idx].flags & AVINDEX_KEYFRAME))
+      return {AV_NOPTS_VALUE, AV_NOPTS_VALUE};
+  }
+
+  int64_t keyPts = st->index_entries[idx].timestamp;
+  // Convert to AV_TIME_BASE
+  int64_t keyPtsAv = av_rescale_q(keyPts, st->time_base, AVRational{AV_TIME_BASE, 1});
+  return {keyPts, keyPtsAv};
+}
+
 bool CDVDDemuxFFmpeg::SeekTime(double time, bool backwards, double* startpts)
 {
   bool hitEnd = false;
@@ -1333,7 +1392,38 @@ bool CDVDDemuxFFmpeg::SeekTime(double time, bool backwards, double* startpts)
   int ret;
   {
     std::unique_lock lock(m_critSection);
-    ret = av_seek_frame(m_pFormatContext, m_seekStream, seek_pts, backwards ? AVSEEK_FLAG_BACKWARD : 0);
+
+    // Keyframe seek optimization: find nearest-prev-keyframe using FFmpeg index
+    // This avoids dropping frames after seek by starting decode from a keyframe
+    int kfStreamIdx = FindKeyFrameStreamIndex();
+    int64_t keyFramePtsAv = AV_NOPTS_VALUE;
+
+    if (kfStreamIdx >= 0 && !m_checkTransportStream && !m_bSup)
+    {
+      auto [kfPtsStream, kfPtsAv] = GetNearestPrevKeyFramePos(kfStreamIdx, seek_pts);
+      if (kfPtsAv != AV_NOPTS_VALUE && kfPtsAv <= seek_pts)
+      {
+        keyFramePtsAv = kfPtsAv;
+        CLog::Log(LOGDEBUG, "{} - keyframe seek: target={}kf, keyframe={}kf, stream={}",
+                  __FUNCTION__, seek_pts, keyFramePtsAv, kfStreamIdx);
+      }
+    }
+
+    if (keyFramePtsAv != AV_NOPTS_VALUE)
+    {
+      // Seek to the nearest previous keyframe using avformat_seek_file
+      // min_ts=0, ts=keyframe position, max_ts=seek_pts
+      // This ensures we land exactly on or before the keyframe
+      ret = avformat_seek_file(m_pFormatContext, kfStreamIdx,
+                               0, keyFramePtsAv, seek_pts,
+                               AVSEEK_FLAG_BACKWARD);
+    }
+    else
+    {
+      // Fallback: original av_seek_frame behavior
+      ret = av_seek_frame(m_pFormatContext, m_seekStream, seek_pts,
+                           backwards ? AVSEEK_FLAG_BACKWARD : 0);
+    }
 
     if (ret < 0)
     {

@@ -183,4 +183,8 @@ protected:
   std::vector<ChapterFFmpeg> m_chapters;
   bool m_dv_dual_stream = false;
   bool m_dv_dual_stream_started = false;
+
+  // Keyframe seek optimization: find nearest-prev-keyframe position
+  int FindKeyFrameStreamIndex() const;
+  std::pair<int64_t, int64_t> GetNearestPrevKeyFramePos(int streamIdx, int64_t targetPts) const;
 };
