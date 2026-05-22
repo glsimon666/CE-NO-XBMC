@@ -65,6 +65,7 @@ protected:
 private:
   std::unique_ptr<CEGLContextUtils> m_pGLContext;
   EGLSurface m_subEGLSurface{EGL_NO_SURFACE};
+  uint32_t m_subFBId{0};
   StreamHdrType m_hdrType = StreamHdrType::HDR_TYPE_NONE;
 };
 
