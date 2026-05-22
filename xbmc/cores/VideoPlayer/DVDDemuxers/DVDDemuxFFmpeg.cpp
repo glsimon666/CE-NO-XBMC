@@ -1338,8 +1338,29 @@ bool CDVDDemuxFFmpeg::SeekTime(double time, bool backwards, double* startpts)
     if (!ist->PosTime(static_cast<int>(time)))
       return false;
 
+    // libbluray's bd_seek_time() seeks to the nearest previous keyframe
+    // (access point via CLPI EP_map). Mark this so the video decoder
+    // knows it can start decoding immediately without dropping frames.
+    m_seekToKeyFrame = true;
+
+    // Use the actual position from libbluray as startpts instead of
+    // DVD_NOPTS_VALUE. This tells VideoPlayer where the seek actually
+    // landed so it can start rendering from the requested time while
+    // the decoder catches up from the keyframe.
     if (startpts)
-      *startpts = DVD_NOPTS_VALUE;
+    {
+      // Try to get actual seek position from Blu-ray input stream
+      CDVDInputStreamBluray* bl = dynamic_cast<CDVDInputStreamBluray*>(m_pInput.get());
+      if (bl)
+      {
+        int actualMs = bl->GetLastSeekTimeMs();
+        *startpts = DVD_MSEC_TO_TIME(actualMs);
+      }
+      else
+      {
+        *startpts = DVD_MSEC_TO_TIME(time);
+      }
+    }
 
     Flush();
 

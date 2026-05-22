@@ -130,6 +130,7 @@ public:
 
   CDVDInputStream::IPosTime* GetIPosTime() override { return this; }
   bool PosTime(int ms) override;
+  int GetLastSeekTimeMs() const { return m_lastSeekTimeMs; }
 
   void GetStreamInfo(int pid, std::string &language);
 
@@ -181,6 +182,7 @@ protected:
   bool m_navmode = false;
   int m_dispTimeBeforeRead = 0;
   int                 m_nTitles = -1;
+  int                 m_lastSeekTimeMs = 0;
   std::string         m_root;
 
   // MVC related members

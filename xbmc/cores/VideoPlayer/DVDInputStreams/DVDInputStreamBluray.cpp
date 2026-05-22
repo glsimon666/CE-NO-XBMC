@@ -990,6 +990,14 @@ bool CDVDInputStreamBluray::PosTime(int ms)
     OpenNextStream();
     SeekMVCDemux(ms - m_clipStartTime);
   }
+
+  // After bd_seek_time, libbluray has seeked to the nearest previous keyframe
+  // (access point) via CLPI EP_map. Record the actual position so the demuxer
+  // can report it as startpts instead of DVD_NOPTS_VALUE.
+  // bd_tell_time() returns the current position in 90kHz ticks.
+  uint64_t tick = bd_tell_time(m_bd);
+  m_lastSeekTimeMs = static_cast<int>(tick / 90);
+
   return true;
 }
 
