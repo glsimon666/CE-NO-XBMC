@@ -71,6 +71,9 @@ public:
   void SetAudioBitsPerSample(int bitsPerSample);
   int GetAudioBitsPerSample();
 
+  void SetAudioPts(double pts);
+  double GetAudioPts();
+
   // content info
 
   /*!
@@ -224,6 +227,7 @@ protected:
     std::string channels_sink;
     int sampleRate;
     int bitsPerSample;
+    double audioPts;
   } m_playerAudioInfo;
 
   mutable CCriticalSection m_contentSection;

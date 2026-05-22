@@ -12,6 +12,14 @@
 #include <stdint.h>
 #include <vector>
 
+struct TrueHDMajorSyncInfo
+{
+  int ratebits{0};
+  uint16_t outputTiming{0};
+  bool outputTimingPresent{false};
+  bool valid{false};
+};
+
 enum class Type
 {
   PADDING,
@@ -27,28 +35,33 @@ public:
   bool PackTrueHD(const uint8_t* data, int size);
   std::vector<uint8_t> GetOutputFrame();
 
+  int GetSamplesOffset() const { return m_lavStyleEnabled ? m_lastOutputSamplesOffset : 0; }
+  bool HadDiscontinuity() const { return m_lavStyleEnabled ? m_lastOutputHadDiscontinuity : false; }
+  void Reset();
+
+  void SetLavStyleEnabled(bool enabled) { m_lavStyleEnabled = enabled; }
+  bool IsLavStyleEnabled() const { return m_lavStyleEnabled; }
+
 private:
   struct MATState
   {
-    bool init; // differentiates the first header
+    bool init;
 
-    // audio_sampling_frequency:
-    //  0 -> 48 kHz
-    //  1 -> 96 kHz
-    //  2 -> 192 kHz
-    //  8 -> 44.1 kHz
-    //  9 -> 88.2 kHz
-    // 10 -> 176.4 kHz
     int ratebits;
 
-    // input timing of previous audio unit used to calculate padding bytes
+    uint16_t outputTiming;
+    bool outputTimingValid;
+
     uint16_t prevFrametime;
     bool prevFrametimeValid;
 
-    uint32_t matFramesize; // size in bytes of current MAT frame
-    uint32_t prevMatFramesize; // size in bytes of previous MAT frame
+    uint32_t matFramesize;
+    uint32_t prevMatFramesize;
 
-    uint32_t padding; // padding bytes pending to write
+    int32_t padding;
+    uint32_t samples;
+    int32_t numberOfSamplesOffset;
+    int32_t nOutputTimeOffset;
   };
 
   void WriteHeader();
@@ -57,10 +70,48 @@ private:
   uint32_t GetCount() const { return m_bufferCount; }
   int FillDataBuffer(const uint8_t* data, int size, Type type);
   void FlushPacket();
+  TrueHDMajorSyncInfo ParseTrueHDMajorSyncHeaders(const uint8_t* p, int buffsize) const;
 
   MATState m_state{};
+  bool m_lavStyleEnabled{false};
+  int m_lastOutputSamplesOffset{0};
+  bool m_lastOutputHadDiscontinuity{false};
 
   uint32_t m_bufferCount{0};
   std::vector<uint8_t> m_buffer;
   std::deque<std::vector<uint8_t>> m_outputQueue;
+
+  std::deque<int> m_offsetQueue;
+  std::deque<bool> m_discontinuityQueue;
+  bool m_pendingDiscontinuity{false};
+};
+
+class CBitStream
+{
+public:
+  CBitStream(const uint8_t* bytes, int _size)
+  {
+    data = bytes;
+    size = _size;
+  }
+
+  int ReadBits(int bits)
+  {
+    int dat = 0;
+    for (int i = index; i < index + bits; i++)
+    {
+      dat = dat * 2 + getbit(data[i / 8], i % 8);
+    }
+    index += bits;
+    return dat;
+  }
+
+  void SkipBits(int bits) { index += bits; }
+
+private:
+  uint8_t getbit(uint8_t x, int y) { return (x >> (7 - y)) & 1; }
+
+  const uint8_t* data{nullptr};
+  int size{0};
+  int index{0};
 };

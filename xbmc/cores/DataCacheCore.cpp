@@ -278,6 +278,20 @@ int CDataCacheCore::GetAudioBitsPerSample()
   return m_playerAudioInfo.bitsPerSample;
 }
 
+void CDataCacheCore::SetAudioPts(double pts)
+{
+  std::unique_lock lock(m_audioPlayerSection);
+
+  m_playerAudioInfo.audioPts = pts;
+}
+
+double CDataCacheCore::GetAudioPts()
+{
+  std::unique_lock lock(m_audioPlayerSection);
+
+  return m_playerAudioInfo.audioPts;
+}
+
 void CDataCacheCore::SetEditList(const std::vector<EDL::Edit>& editList)
 {
   std::unique_lock lock(m_contentSection);

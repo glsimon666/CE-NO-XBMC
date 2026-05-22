@@ -9,8 +9,10 @@
 #pragma once
 
 #include "cores/AudioEngine/Utils/AEAudioFormat.h"
+#include "cores/DataCacheCore.h"
 #include "cores/VideoPlayer/Interface/DemuxPacket.h"
 #include "cores/VideoPlayer/Process/ProcessInfo.h"
+#include "ServiceBroker.h"
 
 #include <vector>
 
@@ -43,13 +45,17 @@ typedef struct stDVDAudioFrame
   int profile;
   bool hasDownmix;
   double centerMixLevel;
+
+  bool hasDiscontinuity{false};
+  double discontinuityCorrection{0.0};
 } DVDAudioFrame;
 
 class CDVDAudioCodec
 {
 public:
 
-  explicit CDVDAudioCodec(CProcessInfo &processInfo) : m_processInfo(processInfo) {}
+  explicit CDVDAudioCodec(CProcessInfo &processInfo) : m_processInfo(processInfo),
+                                                       m_dataCacheCore(CServiceBroker::GetDataCacheCore()) {}
   virtual ~CDVDAudioCodec() = default;
 
   /*
@@ -120,4 +126,5 @@ public:
 
 protected:
   CProcessInfo &m_processInfo;
+  CDataCacheCore &m_dataCacheCore;
 };

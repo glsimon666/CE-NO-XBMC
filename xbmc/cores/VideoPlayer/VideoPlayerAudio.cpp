@@ -9,6 +9,7 @@
 #include "VideoPlayerAudio.h"
 
 #include "DVDCodecs/Audio/DVDAudioCodec.h"
+#include "DVDCodecs/Audio/DVDAudioCodecPassthrough.h"
 #include "DVDCodecs/DVDFactoryCodec.h"
 #include "ServiceBroker.h"
 #include "cores/AudioEngine/Interfaces/AE.h"
@@ -336,6 +337,17 @@ void CVideoPlayerAudio::Process()
         m_audioSink.Resume();
       m_syncState = IDVDStreamPlayer::SYNC_INSYNC;
       m_syncTimer.Set(3000ms);
+
+      // LAV A/V sync: sync passthrough codec internal clock to RESYNC pts
+      if (m_pAudioCodec && m_pAudioCodec->NeedPassthrough())
+      {
+        auto ptCodec = dynamic_cast<CDVDAudioCodecPassthrough*>(m_pAudioCodec.get());
+        if (ptCodec && ptCodec->IsLavStyleSyncEnabled())
+        {
+          ptCodec->ResetLavSyncState();
+          ptCodec->SyncToResyncPts(pts);
+        }
+      }
     }
     else if (pMsg->IsType(CDVDMsg::GENERAL_RESET))
     {
