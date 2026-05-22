@@ -390,6 +390,17 @@ void CDVDVideoCodecAmlogic::Close(void)
 
   m_videoBufferPool = nullptr;
 
+  // restore OSD graphic max when decoder closes
+  if (m_set_osd_bypass || m_opened)
+  {
+    CSysfsPath dv_graphic_max_cpm{"/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max"};
+    CSysfsPath dv_graphic_max_aml{"/sys/module/amdolby_vision/parameters/amdv_graphic_max"};
+    if (dv_graphic_max_cpm.Exists())
+      dv_graphic_max_cpm.Set(100);
+    else if (dv_graphic_max_aml.Exists())
+      dv_graphic_max_aml.Set(100);
+  }
+
   if (m_Codec)
     m_Codec->CloseDecoder(), m_Codec = nullptr;
 
@@ -505,20 +516,7 @@ bool CDVDVideoCodecAmlogic::AddData(const DemuxPacket &packet)
       m_videoBufferPool = std::shared_ptr<CAMLVideoBufferPool>(new CAMLVideoBufferPool());
 
       m_opened = true;
-
-      // DV/HDR bypass: let amdolby_vision kernel module handle OSD luminance in PQ space
-      bool is_hdr = (m_hints.hdrType != StreamHdrType::HDR_TYPE_NONE || dovi_el_type != ELType::TYPE_NONE);
-      if (is_hdr)
-      {
-        // CPM kernel: /sys/module/amdolby_vision/parameters/dolby_vision_graphic_max
-        // Amlogic kernel: /sys/module/amdolby_vision/parameters/amdv_graphic_max
-        CSysfsPath dv_graphic_max_cpm{"/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max"};
-        CSysfsPath dv_graphic_max_aml{"/sys/module/amdolby_vision/parameters/amdv_graphic_max"};
-        if (dv_graphic_max_cpm.Exists())
-          dv_graphic_max_cpm.Set(0);
-        else if (dv_graphic_max_aml.Exists())
-          dv_graphic_max_aml.Set(0);
-      }
+      m_set_osd_bypass = true;
     }
   }
 
@@ -537,6 +535,24 @@ bool CDVDVideoCodecAmlogic::AddData(const DemuxPacket &packet)
   }
 
   data_added = m_Codec->AddData(pData, iSize, packet.dts, m_hints.ptsinvalid ? DVD_NOPTS_VALUE : packet.pts);
+
+  // defer OSD bypass until after first AddData to avoid luminance flicker in GUI/menu
+  if (m_set_osd_bypass)
+  {
+    m_set_osd_bypass = false;
+    bool is_hdr = (m_hints.hdrType != StreamHdrType::HDR_TYPE_NONE || dovi_el_type != ELType::TYPE_NONE);
+    if (is_hdr)
+    {
+      // CPM kernel: /sys/module/amdolby_vision/parameters/dolby_vision_graphic_max
+      // Amlogic kernel: /sys/module/amdolby_vision/parameters/amdv_graphic_max
+      CSysfsPath dv_graphic_max_cpm{"/sys/module/amdolby_vision/parameters/dolby_vision_graphic_max"};
+      CSysfsPath dv_graphic_max_aml{"/sys/module/amdolby_vision/parameters/amdv_graphic_max"};
+      if (dv_graphic_max_cpm.Exists())
+        dv_graphic_max_cpm.Set(0);
+      else if (dv_graphic_max_aml.Exists())
+        dv_graphic_max_aml.Set(0);
+    }
+  }
 
   // pop package only from list if hardware decoder did accept the data
   if (data_added && dual_layer_converted)

@@ -108,4 +108,5 @@ private:
   static std::atomic<bool> m_InstanceGuard;
 
   std::list<DLDemuxPacket> m_packages;
+  bool m_set_osd_bypass{false};
 };
