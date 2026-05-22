@@ -148,6 +148,7 @@ void CRenderer::Render(int idx, float depth)
     winSystem->BeginSubtitleRender();
 
   std::vector<SElement>& list = m_buffers[idx];
+  bool rendered = false;
   for(std::vector<SElement>::iterator it = list.begin(); it != list.end(); ++it)
   {
     if (it->overlay_dvd)
@@ -155,10 +156,13 @@ void CRenderer::Render(int idx, float depth)
       std::shared_ptr<COverlay> o = Convert(*(it->overlay_dvd), it->pts);
 
       if (o)
+      {
         Render(o.get());
+        rendered = true;
+      }
     }
   }
-  else if (winSystem && winSystem->HasSubSurface())
+  if (!rendered && winSystem && winSystem->HasSubSurface())
   {
     winSystem->ClearSubFBId();
   }
