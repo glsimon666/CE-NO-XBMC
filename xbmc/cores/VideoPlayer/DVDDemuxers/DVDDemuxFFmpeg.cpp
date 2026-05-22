@@ -2246,15 +2246,52 @@ CDemuxStream* CDVDDemuxFFmpeg::AddStream(int streamIdx)
 
       if (it != m_streams.end())
       {
-        if (stream->codec == AV_CODEC_ID_AC3 && it->second->codec == AV_CODEC_ID_TRUEHD)
-          CLog::Log(LOGDEBUG, "CDVDDemuxFFmpeg::AddStream - discarding duplicated bluray stream (truehd ac3 core)");
-        else
-          CLog::Log(LOGDEBUG, "CDVDDemuxFFmpeg::AddStream - discarding duplicate bluray stream {}",
-                    stream->codecName);
+        /*
+         * Handle shared-PID deduplication, particularly TrueHD + AC-3 core
+         * on the same PID (e.g. PID 0x1101 in Blu-ray MPEG-TS).
+         *
+         * FFmpeg presents them as two separate AVStreams with the same id.
+         * The TrueHD stream is the primary; the AC-3 stream is the embedded
+         * compatibility core. After seeking or audio track switching,
+         * FFmpeg may present them in either order.
+         *
+         * Strategy: TrueHD always wins over AC-3 on the same PID.
+         * If the existing stream is AC-3 and the new one is TrueHD,
+         * discard the old AC-3 and keep the new TrueHD (swap).
+         */
+        bool discardNew = true;
 
-        pStream->discard = AVDISCARD_ALL;
-        delete stream;
-        return nullptr;
+        if (stream->codec == AV_CODEC_ID_TRUEHD &&
+            it->second->codec == AV_CODEC_ID_AC3)
+        {
+          CLog::Log(LOGDEBUG,
+                    "CDVDDemuxFFmpeg::AddStream - replacing ac3 core with "
+                    "truehd on shared PID 0x{:04x}", stream->dvdNavId);
+          pStream->discard = AVDISCARD_ALL;
+          delete it->second;
+          m_streams.erase(it);
+          discardNew = false;
+        }
+        else if (stream->codec == AV_CODEC_ID_AC3 &&
+                 it->second->codec == AV_CODEC_ID_TRUEHD)
+        {
+          CLog::Log(LOGDEBUG,
+                    "CDVDDemuxFFmpeg::AddStream - discarding duplicated "
+                    "bluray stream (truehd ac3 core)");
+        }
+        else
+        {
+          CLog::Log(LOGDEBUG,
+                    "CDVDDemuxFFmpeg::AddStream - discarding duplicate "
+                    "bluray stream {}", stream->codecName);
+        }
+
+        if (discardNew)
+        {
+          pStream->discard = AVDISCARD_ALL;
+          delete stream;
+          return nullptr;
+        }
       }
       std::static_pointer_cast<CDVDInputStreamBluray>(m_pInput)->GetStreamInfo(pStream->id, stream->language);
     }
