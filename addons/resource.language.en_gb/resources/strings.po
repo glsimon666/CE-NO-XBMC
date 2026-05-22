@@ -9043,6 +9043,31 @@ msgctxt "#14427"
 msgid "Player-Led"
 msgstr ""
 
+#: system/settings/settings.xml
+msgctxt "#14428"
+msgid "LAV A/V Sync Mode"
+msgstr ""
+
+#: system/settings/settings.xml
+msgctxt "#14429"
+msgid "Select LAV A/V synchronization mode for passthrough audio. Off: standard Kodi PTS handling. Seamless Branch: fix TrueHD/MAT discontinuity during Blu-ray seamless branches. Full: internal clock with jitter tracking and seamless branch fix."
+msgstr ""
+
+#: system/settings/settings.xml
+msgctxt "#14430"
+msgid "Off"
+msgstr ""
+
+#: system/settings/settings.xml
+msgctxt "#14431"
+msgid "Seamless Branch Only"
+msgstr ""
+
+#: system/settings/settings.xml
+msgctxt "#14432"
+msgid "Full LAV Sync"
+msgstr ""
+
 #: xbmc/music/MusicDatabase.cpp
 #: xbmc/video/VideoDatabase.cpp
 msgctxt "#15011"

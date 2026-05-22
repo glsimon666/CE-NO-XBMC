@@ -111,6 +111,39 @@ void CVideoPlayerAudio::OpenStream(CDVDStreamInfo& hints, std::unique_ptr<CDVDAu
 {
   m_pAudioCodec = std::move(codec);
 
+  // LAV A/V Sync: configure passthrough codec based on settings
+  // 0 = Off, 1 = Seamless Branch Only, 2 = Full LAV Sync
+  int lavSyncMode = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(
+      CSettings::SETTING_COREELEC_AMLOGIC_DV_AUDIO_LAVSYNC);
+  bool enableLavFull = (lavSyncMode == 2);
+  bool enableLavSeamlessBranch = (lavSyncMode == 1);
+
+  if (m_pAudioCodec && m_pAudioCodec->NeedPassthrough())
+  {
+    auto ptCodec = dynamic_cast<CDVDAudioCodecPassthrough*>(m_pAudioCodec.get());
+    if (ptCodec)
+    {
+      if (enableLavFull)
+        ptCodec->SetLavStyleSyncEnabled(true);
+      else if (enableLavSeamlessBranch)
+        ptCodec->SetLavSeamlessBranchEnabled(true);
+
+      CLog::Log(LOGDEBUG, "CVideoPlayerAudio::OpenStream - LAV passthrough: {}",
+                enableLavFull ? "FULL" :
+                (enableLavSeamlessBranch ? "SEAMLESS BRANCH ONLY" : "disabled"));
+
+      if (enableLavFull && m_syncState == IDVDStreamPlayer::SYNC_INSYNC && m_pClock)
+      {
+        double masterClock = m_pClock->GetClock();
+        double audioDelay = m_audioSink.GetDelay();
+        double syncPts = masterClock + audioDelay * DVD_TIME_BASE;
+        ptCodec->SyncToResyncPts(syncPts);
+        CLog::Log(LOGDEBUG, "CVideoPlayerAudio::OpenStream - Synced new codec to master clock {:.3f}s (delay {:.3f}s)",
+                  masterClock / DVD_TIME_BASE, audioDelay);
+      }
+    }
+  }
+
 
   /* store our stream hints */
   m_streaminfo = hints;
