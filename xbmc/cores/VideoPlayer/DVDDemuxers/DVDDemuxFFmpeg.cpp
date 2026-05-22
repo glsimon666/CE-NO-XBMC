@@ -1280,7 +1280,13 @@ bool CDVDDemuxFFmpeg::SeekTime(double time, bool backwards, double* startpts)
       return false;
 
     if (startpts)
-      *startpts = DVD_NOPTS_VALUE;
+    {
+      CDVDInputStream::IDisplayTime* dt = m_pInput->GetIDisplayTime();
+      if (dt)
+        *startpts = DVD_MSEC_TO_TIME(dt->GetTime());
+      else
+        *startpts = DVD_NOPTS_VALUE;
+    }
 
     Flush();
 

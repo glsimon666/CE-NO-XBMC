@@ -981,9 +981,22 @@ bool CDVDInputStreamBluray::PosTime(int ms)
   if(bd_seek_time(m_bd, ms * 90) < 0)
     return false;
 
+  m_dispTimeBeforeRead = static_cast<int>(bd_tell_time(m_bd) / 90);
+  m_hold = HOLD_NONE;
+
   EMPTY_QUEUE(m_clipQueue);
   while (bd_get_event(m_bd, &m_event))
-    ProcessEvent();
+  {
+    if (m_event.event == BD_EVENT_DISCONTINUITY)
+    {
+      CLog::Log(LOGDEBUG, "CDVDInputStreamBluray - BD_EVENT_DISCONTINUITY (during seek)");
+      m_hold = HOLD_NONE;
+    }
+    else
+    {
+      ProcessEvent();
+    }
+  }
 
   if (m_bMVCPlayback)
   {
@@ -1014,9 +1027,22 @@ bool CDVDInputStreamBluray::SeekChapter(int ch)
   if(m_titleInfo && bd_seek_chapter(m_bd, ch-1) < 0)
     return false;
 
+  m_dispTimeBeforeRead = static_cast<int>(bd_tell_time(m_bd) / 90);
+  m_hold = HOLD_NONE;
+
   EMPTY_QUEUE(m_clipQueue);
   while (bd_get_event(m_bd, &m_event))
-    ProcessEvent();
+  {
+    if (m_event.event == BD_EVENT_DISCONTINUITY)
+    {
+      CLog::Log(LOGDEBUG, "CDVDInputStreamBluray - BD_EVENT_DISCONTINUITY (during seek chapter)");
+      m_hold = HOLD_NONE;
+    }
+    else
+    {
+      ProcessEvent();
+    }
+  }
 
   if (m_bMVCPlayback)
   {
