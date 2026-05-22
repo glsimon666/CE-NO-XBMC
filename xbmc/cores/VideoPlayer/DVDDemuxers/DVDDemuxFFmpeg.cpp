@@ -1364,6 +1364,37 @@ bool CDVDDemuxFFmpeg::SeekTime(double time, bool backwards, double* startpts)
 
     Flush();
 
+    // For transport stream sources (UHD Blu-ray MPEG-TS), libbluray's
+    // file_seek() repositions the underlying M2TS handle, but FFmpeg's
+    // mpegts demuxer was flushed and needs to re-synchronise to the new
+    // position. Without this wait, video packets may arrive before the
+    // demuxer has re-discovered audio PIDs from the PMT, causing audio
+    // to be silently missing after seek.
+    if (m_checkTransportStream)
+    {
+      m_startTime = 0;
+      XbmcThreads::EndTime<> timer(5000ms);
+
+      while (!IsTransportStreamReady())
+      {
+        DemuxPacket* pkt = Read();
+        if (pkt)
+          CDVDDemuxUtils::FreeDemuxPacket(pkt);
+        else
+          KODI::TIME::Sleep(10ms);
+        m_pkt.result = -1;
+        av_packet_unref(&m_pkt.pkt);
+
+        if (timer.IsTimePast())
+        {
+          CLog::Log(LOGWARNING,
+                    "CDVDDemuxFFmpeg::{} - timed out waiting for "
+                    "transport stream after Blu-ray seek", __FUNCTION__);
+          break;
+        }
+      }
+    }
+
     return true;
   }
   else if (m_pSSIF)
