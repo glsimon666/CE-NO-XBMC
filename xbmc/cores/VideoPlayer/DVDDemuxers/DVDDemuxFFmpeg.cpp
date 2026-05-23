@@ -1269,14 +1269,15 @@ int CDVDDemuxFFmpeg::FindKeyFrameStreamIndex() const
     AVStream* st = m_pFormatContext->streams[i];
     if (st->codecpar->codec_type == AVMEDIA_TYPE_VIDEO && videoStreamIdx < 0)
       videoStreamIdx = i;
-    if (st->nb_index_entries > bestNbIndexEntries)
+    int nbEntries = avformat_index_get_entries_count(st);
+    if (nbEntries > bestNbIndexEntries)
     {
-      bestNbIndexEntries = st->nb_index_entries;
+      bestNbIndexEntries = nbEntries;
       bestStreamIdx = i;
     }
   }
 
-  if (videoStreamIdx >= 0 && m_pFormatContext->streams[videoStreamIdx]->nb_index_entries > 0)
+  if (videoStreamIdx >= 0 && avformat_index_get_entries_count(m_pFormatContext->streams[videoStreamIdx]) > 0)
     return videoStreamIdx;
   if (bestStreamIdx >= 0)
     return bestStreamIdx;
@@ -1290,27 +1291,30 @@ std::pair<int64_t, int64_t> CDVDDemuxFFmpeg::GetNearestPrevKeyFramePos(int strea
 
   // Use avformat_seek_file's internal logic: search the index for nearest keyframe <= targetPts
   // We use av_index_search_timestamp which finds the nearest index entry <= timestamp
+  int nbEntries = avformat_index_get_entries_count(st);
   int idx = av_index_search_timestamp(st, targetPts, AVSEEK_FLAG_BACKWARD);
-  if (idx < 0 || idx >= st->nb_index_entries)
+  if (idx < 0 || idx >= nbEntries)
     return {AV_NOPTS_VALUE, AV_NOPTS_VALUE};
 
-  AVIndexEntry& entry = st->index_entries[idx];
-  if (!(entry.flags & AVINDEX_KEYFRAME))
+  const AVIndexEntry* entry = avformat_index_get_entry(st, idx);
+  if (!entry || !(entry->flags & AVINDEX_KEYFRAME))
   {
     // Not a keyframe - search backward for one
     for (int i = idx; i >= 0; i--)
     {
-      if (st->index_entries[i].flags & AVINDEX_KEYFRAME)
+      const AVIndexEntry* e = avformat_index_get_entry(st, i);
+      if (e && (e->flags & AVINDEX_KEYFRAME))
       {
         idx = i;
+        entry = e;
         break;
       }
     }
-    if (!(st->index_entries[idx].flags & AVINDEX_KEYFRAME))
+    if (!entry || !(entry->flags & AVINDEX_KEYFRAME))
       return {AV_NOPTS_VALUE, AV_NOPTS_VALUE};
   }
 
-  int64_t keyPts = st->index_entries[idx].timestamp;
+  int64_t keyPts = entry->timestamp;
   // Convert to AV_TIME_BASE
   int64_t keyPtsAv = av_rescale_q(keyPts, st->time_base, AVRational{AV_TIME_BASE, 1});
   return {keyPts, keyPtsAv};
