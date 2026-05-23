@@ -135,8 +135,8 @@ void CVideoPlayerAudio::OpenStream(CDVDStreamInfo& hints, std::unique_ptr<CDVDAu
     AVSyncPlaybackMode avMode = m_pAudioCodec->NeedPassthrough()
         ? AVS_MODE_PASSTHROUGH : AVS_MODE_PCM;
     double fps = 0.0;
-    if (m_processInfo.GetVideoSettings().m_VideoFrameRate > 0)
-      fps = m_processInfo.GetVideoSettings().m_VideoFrameRate;
+    if (m_processInfo.GetVideoFps() > 0)
+      fps = m_processInfo.GetVideoFps();
     m_avSyncController.Open(avMode, fps,
                             static_cast<uint32_t>(m_streaminfo.samplerate),
                             0);
@@ -411,6 +411,7 @@ void CVideoPlayerAudio::Process()
         m_pAudioCodec->Reset();
       m_avSyncController.NotifyFlush();
     }
+    else if (pMsg->IsType(CDVDMsg::GENERAL_EOF))
     {
       CLog::Log(LOGDEBUG, "CVideoPlayerAudio - CDVDMsg::GENERAL_EOF");
     }
