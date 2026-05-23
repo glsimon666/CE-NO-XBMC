@@ -370,14 +370,17 @@ void CVideoPlayerAudio::Process()
       m_syncState = IDVDStreamPlayer::SYNC_INSYNC;
       m_syncTimer.Set(3000ms);
 
-      // LAV A/V sync: sync passthrough codec internal clock to RESYNC pts
+      // LAV A/V sync: sync passthrough codec internal clock to RESYNC pts + delay
+      // Adding audio sink delay ensures the codec's internal PTS properly accounts
+      // for data already buffered in the AE pipeline, preventing large sync errors
+      // after seek due to PTS/clock misalignment.
       if (m_pAudioCodec && m_pAudioCodec->NeedPassthrough())
       {
         auto ptCodec = dynamic_cast<CDVDAudioCodecPassthrough*>(m_pAudioCodec.get());
         if (ptCodec && ptCodec->IsLavStyleSyncEnabled())
         {
           ptCodec->ResetLavSyncState();
-          ptCodec->SyncToResyncPts(pts);
+          ptCodec->SyncToResyncPts(pts + delay);
         }
       }
       m_avSyncController.NotifyResume();

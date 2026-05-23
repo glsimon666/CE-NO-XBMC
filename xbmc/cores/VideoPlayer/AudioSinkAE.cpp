@@ -111,6 +111,19 @@ unsigned int CAudioSinkAE::AddPackets(const DVDAudioFrame &audioframe)
       m_resampleRatio = info.rr;
     }
   }
+  else if (info.state == CAESyncInfo::SYNC_ADJUST)
+  {
+    // During SYNC_ADJUST, report sync error so the player's ErrorAdjust
+    // (SYNC_DISCON path) can correct the master clock speed faster,
+    // rather than relying solely on the AE's per-buffer pause/skip
+    // correction which is very slow for large errors.
+    unsigned int newTime = info.errortime;
+    if (newTime != m_syncErrorTime)
+    {
+      m_syncErrorTime = info.errortime;
+      m_syncError = info.error / 1000 * DVD_TIME_BASE;
+    }
+  }
   else
   {
     m_syncErrorTime = 0;

@@ -2261,14 +2261,23 @@ void CVideoPlayer::HandlePlaySpeed()
       }
 
       m_clock.Discontinuity(clock);
-      m_CurrentAudio.syncState = IDVDStreamPlayer::SYNC_INSYNC;
-      m_CurrentAudio.avsync = CCurrentStream::AV_SYNC_NONE;
       m_CurrentVideo.syncState = IDVDStreamPlayer::SYNC_INSYNC;
       m_CurrentVideo.avsync = CCurrentStream::AV_SYNC_NONE;
-      m_VideoPlayerAudio->SendMessage(
-          std::make_shared<CDVDMsgDouble>(CDVDMsg::GENERAL_RESYNC, clock), 1);
       m_VideoPlayerVideo->SendMessage(
           std::make_shared<CDVDMsgDouble>(CDVDMsg::GENERAL_RESYNC, clock), 1);
+
+      // Delay audio RESYNC if video doesn't have valid PTS yet.
+      // This prevents audio from starting with a stale clock while
+      // video is still decoding its first keyframe after seek.
+      // Once video catches up, the next Sync() cycle will proceed.
+      if (m_CurrentVideo.id < 0 || m_CurrentVideo.starttime != DVD_NOPTS_VALUE)
+      {
+        m_CurrentAudio.syncState = IDVDStreamPlayer::SYNC_INSYNC;
+        m_CurrentAudio.avsync = CCurrentStream::AV_SYNC_NONE;
+        m_VideoPlayerAudio->SendMessage(
+            std::make_shared<CDVDMsgDouble>(CDVDMsg::GENERAL_RESYNC, clock), 1);
+      }
+
       SetCaching(CACHESTATE_DONE);
       UpdatePlayState(0);
 
