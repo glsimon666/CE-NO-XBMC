@@ -2109,6 +2109,25 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints, enum ELType dovi_el_type)
       (hints.dovi.dv_profile == 4 || hints.dovi.dv_profile == 7) ?
      ((dovi_el_type == ELType::TYPE_FEL) ? ", full enhancement layer" : ", minimum enhancement layer") : "");
 
+  if (hints.hdrType == StreamHdrType::HDR_TYPE_HDR10 ||
+      hints.hdrType == StreamHdrType::HDR_TYPE_HLG)
+  {
+    CSysfsPath signalPath{"/sys/class/video/signal_type"};
+    if (signalPath.Exists())
+    {
+      std::string sigStr = signalPath.GetString();
+      if (!sigStr.empty())
+      {
+        unsigned int signalType = std::stoul(sigStr, nullptr, 0);
+        if ((signalType >> 31) & 1)
+        {
+          CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder CUVA VIVID detected (signal_type bit31 set)");
+          hints.hdrType = StreamHdrType::HDR_TYPE_CUVA_VIVID;
+        }
+      }
+    }
+  }
+
   m_processInfo.SetVideoDAR(hints.aspect);
   CLog::Log(LOGDEBUG, "CAMLCodec::OpenDecoder decoder timeout: {:d}s",
     m_decoder_timeout);
