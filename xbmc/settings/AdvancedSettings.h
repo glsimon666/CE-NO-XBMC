@@ -424,6 +424,14 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
 
     int  m_videoDecoderTimeout;
 
+    // Bluray ISO cache settings
+    unsigned int m_blurayIsoCachePageSize;
+    unsigned int m_blurayIsoCacheMaxBytes;
+
+    // CurlFile LRU cache settings (HTTP ISO streaming)
+    unsigned int m_curlFileLRUCacheBlockSize;
+    unsigned int m_curlFileLRUCacheMaxBytes;
+
   private:
     void Initialize();
     void Clear();

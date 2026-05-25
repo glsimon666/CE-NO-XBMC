@@ -233,6 +233,12 @@ void CAdvancedSettings::Initialize()
 
   m_videoDecoderTimeout = 5;
 
+  m_blurayIsoCachePageSize = 1024 * 1024;
+  m_blurayIsoCacheMaxBytes = 128 * 1024 * 1024;
+
+  m_curlFileLRUCacheBlockSize = 1024 * 1024;
+  m_curlFileLRUCacheMaxBytes = 128 * 1024 * 1024;
+
   m_musicUseTimeSeeking = true;
   m_musicTimeSeekForward = 10;
   m_musicTimeSeekBackward = -10;
@@ -579,7 +585,7 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
     return;
   }
 
-  const TiXmlElement* pRootElement = advancedXML.RootElement();
+  TiXmlElement* pRootElement = advancedXML.RootElement();
   if (!pRootElement || StringUtils::CompareNoCase(pRootElement->Value(), "advancedsettings") != 0)
   {
     CLog::Log(LOGERROR, "Error loading {}, no <advancedsettings> node", file);
@@ -634,7 +640,23 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
   CLog::Log(LOGINFO, "Contents of {} are...\n{}", file,
             std::regex_replace(printer.CStr(), redactRe, "$1USERNAME:PASSWORD@"));
 
-  const TiXmlElement* pElement = pRootElement->FirstChildElement("audio");
+  TiXmlElement* pElement = pRootElement->FirstChildElement("blurayisocache");
+  if (pElement)
+  {
+    XMLUtils::GetUInt(pElement, "pagesize", m_blurayIsoCachePageSize, 2048, 1024 * 1024);
+    XMLUtils::GetUInt(pElement, "maxbytes", m_blurayIsoCacheMaxBytes, 256 * 1024,
+                      1024 * 1024 * 1024);
+  }
+
+  pElement = pRootElement->FirstChildElement("curlfurlrucache");
+  if (pElement)
+  {
+    XMLUtils::GetUInt(pElement, "blocksize", m_curlFileLRUCacheBlockSize, 4096, 16 * 1024 * 1024);
+    XMLUtils::GetUInt(pElement, "maxbytes", m_curlFileLRUCacheMaxBytes, 256 * 1024,
+                      1024 * 1024 * 1024);
+  }
+
+  pElement = pRootElement->FirstChildElement("audio");
   if (pElement)
   {
     XMLUtils::GetString(pElement, "defaultplayer", m_audioDefaultPlayer);
