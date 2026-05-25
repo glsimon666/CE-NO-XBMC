@@ -2103,7 +2103,6 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints, enum ELType dovi_el_type)
     CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder CUVA VIVID detected, disabling DV");
     CSysfsPath("/sys/module/aml_media/parameters/dolby_vision_enable", 'N');
     CSysfsPath("/sys/module/aml_media/parameters/dolby_vision_policy", 0);
-    CSysfsPath("/sys/module/aml_media/parameters/hdr_policy", 1);
   }
 
   m_processInfo.SetVideoDAR(hints.aspect);
