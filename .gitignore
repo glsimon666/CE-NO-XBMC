@@ -268,3 +268,4 @@ exclude_dll.txt
 
 # clangd index
 .cache/
+CE-NO-COMMON-DRIVERS
