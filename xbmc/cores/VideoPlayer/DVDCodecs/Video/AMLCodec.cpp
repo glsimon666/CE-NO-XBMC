@@ -2109,23 +2109,12 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints, enum ELType dovi_el_type)
       (hints.dovi.dv_profile == 4 || hints.dovi.dv_profile == 7) ?
      ((dovi_el_type == ELType::TYPE_FEL) ? ", full enhancement layer" : ", minimum enhancement layer") : "");
 
-  if (hints.hdrType == StreamHdrType::HDR_TYPE_HDR10 ||
-      hints.hdrType == StreamHdrType::HDR_TYPE_HLG)
+  if (hints.hdrType == StreamHdrType::HDR_TYPE_CUVA_VIVID)
   {
-    CSysfsPath signalPath{"/sys/class/video/signal_type"};
-    if (signalPath.Exists())
-    {
-      std::string sigStr = signalPath.GetString();
-      if (!sigStr.empty())
-      {
-        unsigned int signalType = std::stoul(sigStr, nullptr, 0);
-        if ((signalType >> 31) & 1)
-        {
-          CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder CUVA VIVID detected (signal_type bit31 set)");
-          hints.hdrType = StreamHdrType::HDR_TYPE_CUVA_VIVID;
-        }
-      }
-    }
+    CLog::Log(LOGINFO, "CAMLCodec::OpenDecoder CUVA VIVID detected, disabling DV");
+    CSysfsPath("/sys/module/aml_media/parameters/dolby_vision_enable", 'N');
+    CSysfsPath("/sys/module/aml_media/parameters/dolby_vision_policy", 0);
+    CSysfsPath("/sys/module/aml_media/parameters/hdr_policy", 1);
   }
 
   m_processInfo.SetVideoDAR(hints.aspect);
