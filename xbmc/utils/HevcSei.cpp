@@ -150,6 +150,30 @@ std::optional<const CHevcSei*> CHevcSei::FindHdr10PlusSeiMessage(
   return {};
 }
 
+std::optional<const CHevcSei*> CHevcSei::FindCuvaSeiMessage(
+    const std::vector<uint8_t>& buf, const std::vector<CHevcSei>& messages)
+{
+  for (const CHevcSei& sei : messages)
+  {
+    // User Data Registered ITU-T T.35
+    if (sei.m_payloadType == 4 && sei.m_payloadSize >= 7)
+    {
+      CBitstreamReader br(buf.data() + sei.m_payloadOffset, sei.m_payloadSize);
+      const auto itu_t_t35_country_code = br.ReadBits(8);
+      const auto itu_t_t35_terminal_provider_code = br.ReadBits(16);
+      const auto itu_t_t35_terminal_provider_oriented_code = br.ReadBits(16);
+
+      // China, HDR VIVID
+      if (itu_t_t35_country_code == 0x26 && itu_t_t35_terminal_provider_code == 0x0004)
+      {
+        return &sei;
+      }
+    }
+  }
+
+  return {};
+}
+
 std::pair<bool, const std::vector<uint8_t>> CHevcSei::RemoveHdr10PlusFromSeiNalu(
     const uint8_t* inData, const size_t inDataLen)
 {

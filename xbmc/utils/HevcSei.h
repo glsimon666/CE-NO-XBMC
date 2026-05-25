@@ -49,6 +49,10 @@ public:
   static std::optional<const CHevcSei*> FindHdr10PlusSeiMessage(
       const std::vector<uint8_t>& buf, const std::vector<CHevcSei>& messages);
 
+  // Returns a CUVA VIVID SEI message if present in the list
+  static std::optional<const CHevcSei*> FindCuvaSeiMessage(
+      const std::vector<uint8_t>& buf, const std::vector<CHevcSei>& messages);
+
   // Returns a pair with:
   //   1) a bool for whether or not the NALU SEI payload contains a HDR10+ SEI message.
   //   2) a vector of bytes:

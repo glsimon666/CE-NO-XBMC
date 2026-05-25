@@ -39,6 +39,8 @@
 #include "utils/XTimeUtils.h"
 #include "utils/log.h"
 
+#include "utils/HevcSei.h"
+
 #include <memory>
 #include <mutex>
 #include <sstream>
@@ -2760,20 +2762,76 @@ StreamHdrType CDVDDemuxFFmpeg::DetermineHdrType(AVStream* pStream)
                               pStream->codecpar->nb_coded_side_data,
                               AV_PKT_DATA_DOVI_CONF) || convert_dual_stream) // DoVi
     hdrType = StreamHdrType::HDR_TYPE_DOLBYVISION;
-  else if (av_packet_side_data_get(pStream->codecpar->coded_side_data,
-                                   pStream->codecpar->nb_coded_side_data,
-                                   AV_PKT_DATA_CUVA_VIVID_METADATA)) // CUVA VIVID
-    hdrType = StreamHdrType::HDR_TYPE_CUVA_VIVID;
-  else if (pStream->codecpar->color_trc == AVCOL_TRC_SMPTE2084) // HDR10
-    hdrType = StreamHdrType::HDR_TYPE_HDR10;
-  else if (pStream->codecpar->color_trc == AVCOL_TRC_ARIB_STD_B67) // HLG
-    hdrType = StreamHdrType::HDR_TYPE_HLG;
-  // file could be SMPTE2086 which FFmpeg currently returns as unknown
-  // so use the presence of static metadata to detect it
-  else if (av_packet_side_data_get(pStream->codecpar->coded_side_data,
-                                   pStream->codecpar->nb_coded_side_data,
-                                   AV_PKT_DATA_MASTERING_DISPLAY_METADATA))
-    hdrType = StreamHdrType::HDR_TYPE_HDR10;
+  else if (pStream->codecpar->codec_id == AV_CODEC_ID_HEVC &&
+           pStream->codecpar->extradata && pStream->codecpar->extradata_size > 23)
+  {
+    const uint8_t* data = pStream->codecpar->extradata;
+    int size = pStream->codecpar->extradata_size;
+
+    if (data[0] == 1)
+    {
+      int numOfArrays = data[22];
+      int offset = 23;
+
+      for (int i = 0; i < numOfArrays; i++)
+      {
+        if (offset + 3 > size)
+          break;
+        int nal_type = data[offset] & 0x3F;
+        int numNalus = (data[offset + 1] << 8) | data[offset + 2];
+        offset += 3;
+
+        if (nal_type == 39 || nal_type == 40)
+        {
+          for (int j = 0; j < numNalus; j++)
+          {
+            if (offset + 2 > size)
+              break;
+            int nal_len = (data[offset] << 8) | data[offset + 1];
+            offset += 2;
+            if (offset + nal_len > size)
+              break;
+
+            std::vector<uint8_t> buf;
+            std::vector<CHevcSei> messages =
+                CHevcSei::ParseSeiRbspUnclearedEmulation(data + offset, nal_len, buf);
+            if (CHevcSei::FindCuvaSeiMessage(buf, messages))
+            {
+              hdrType = StreamHdrType::HDR_TYPE_CUVA_VIVID;
+              break;
+            }
+            offset += nal_len;
+          }
+        }
+        else
+        {
+          for (int j = 0; j < numNalus; j++)
+          {
+            if (offset + 2 > size)
+              break;
+            int nal_len = (data[offset] << 8) | data[offset + 1];
+            offset += 2 + nal_len;
+          }
+        }
+
+        if (hdrType == StreamHdrType::HDR_TYPE_CUVA_VIVID)
+          break;
+      }
+    }
+  }
+  if (hdrType != StreamHdrType::HDR_TYPE_CUVA_VIVID)
+  {
+    if (pStream->codecpar->color_trc == AVCOL_TRC_SMPTE2084) // HDR10
+      hdrType = StreamHdrType::HDR_TYPE_HDR10;
+    else if (pStream->codecpar->color_trc == AVCOL_TRC_ARIB_STD_B67) // HLG
+      hdrType = StreamHdrType::HDR_TYPE_HLG;
+    // file could be SMPTE2086 which FFmpeg currently returns as unknown
+    // so use the presence of static metadata to detect it
+    else if (av_packet_side_data_get(pStream->codecpar->coded_side_data,
+                                     pStream->codecpar->nb_coded_side_data,
+                                     AV_PKT_DATA_MASTERING_DISPLAY_METADATA))
+      hdrType = StreamHdrType::HDR_TYPE_HDR10;
+  }
 
   return hdrType;
 }
