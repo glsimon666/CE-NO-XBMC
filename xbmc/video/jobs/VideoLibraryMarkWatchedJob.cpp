@@ -107,7 +107,9 @@ bool CVideoLibraryMarkWatchedJob::Work(CVideoDatabase &db)
     const CFileItemPtr& item = *iter;
 
     std::string path(item->GetPath());
-    if (item->HasVideoInfoTag() && !item->GetVideoInfoTag()->GetPath().empty())
+    if (CUtil::UseDynPathForAddOrUpdate(*item))
+      path = item->GetDynPath();
+    else if (item->HasVideoInfoTag() && !item->GetVideoInfoTag()->GetPath().empty())
       path = item->GetVideoInfoTag()->GetPath();
 
     // With both mark as watched and unwatched we want the resume bookmarks to be reset
