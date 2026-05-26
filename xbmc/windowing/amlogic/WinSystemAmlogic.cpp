@@ -103,6 +103,10 @@ void CWinSystemAmlogic::SettingOptionsComponentsFiller(const SettingConstPtr& se
   if ((dv_cap & LL_YCbCr_422_12BIT) != 0)
     list.emplace_back(CServiceBroker::GetResourcesComponent().GetLocalizeStrings().Get(14427),
                       AML_DV_PLAYER_LED);
+
+  if (list.empty())
+    list.emplace_back(CServiceBroker::GetResourcesComponent().GetLocalizeStrings().Get(14427),
+                      AML_DV_PLAYER_LED);
 }
 
 void CWinSystemAmlogic::MonitorStart()
