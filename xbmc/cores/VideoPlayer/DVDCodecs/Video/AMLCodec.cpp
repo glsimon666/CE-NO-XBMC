@@ -2168,16 +2168,14 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints, enum ELType dovi_el_type)
 
     if (hints.dovi.dv_profile == 4 || hints.dovi.dv_profile == 7)
     {
-      if (dovi_el_type != ELType::TYPE_MEL) // use stream path if not MEL
+      CSysfsPath amdolby_vision_debug{"/sys/class/amdolby_vision/debug"};
+      if (amdolby_vision_debug.Exists())
       {
-        CSysfsPath amdolby_vision_debug{"/sys/class/amdolby_vision/debug"};
-        if (amdolby_vision_debug.Exists())
-        {
-          amdolby_vision_debug.Set("enable_fel 1");
-          amdolby_vision_debug.Set("enable_mel 1");
-        }
-        am_private->gcodec.dec_mode = STREAM_TYPE_STREAM;
+        amdolby_vision_debug.Set("enable_fel 1");
+        amdolby_vision_debug.Set("enable_mel 1");
       }
+      if (dovi_el_type != ELType::TYPE_MEL) // use stream path if not MEL
+        am_private->gcodec.dec_mode = STREAM_TYPE_STREAM;
     }
   }
 
