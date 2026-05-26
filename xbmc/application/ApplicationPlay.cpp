@@ -117,9 +117,14 @@ void CApplicationPlay::GetOptionsAndUpdateItem()
     if (!db.Open())
       return;
 
-    // Get path
+    // Get path - must use the same path selection logic as SaveFileStateJob::DoWork
+    // to ensure we look up bookmarks at the same path they were saved.
     std::string path{m_item.GetPath()};
-    if (m_item.HasVideoInfoTag())
+    if (CUtil::UseDynPathForAddOrUpdate(m_item))
+    {
+      path = m_item.GetDynPath();
+    }
+    else if (m_item.HasVideoInfoTag())
     {
       const std::string videoInfoTagPath{m_item.GetVideoInfoTag()->m_strFileNameAndPath};
       // removable:// may be embedded in bluray:// path
@@ -127,10 +132,12 @@ void CApplicationPlay::GetOptionsAndUpdateItem()
           VIDEO::IsVideoDb(m_item))
         path = videoInfoTagPath;
     }
-    else if (m_item.HasProperty("original_listitem_url") &&
-             URIUtils::IsPlugin(m_item.GetProperty("original_listitem_url").asString()))
+    else if (m_item.HasProperty("original_listitem_url"))
     {
-      path = m_item.GetProperty("original_listitem_url").asString();
+      std::string original{m_item.GetProperty("original_listitem_url").asString()};
+      if (URIUtils::IsPlugin(original) || URIUtils::IsUPnP(original) ||
+          URIUtils::IsBlurayPath(m_item.GetPath()))
+        path = original;
     }
 
     // Note that we need to load the tag from database also if the item already has a tag,
@@ -365,9 +372,34 @@ CApplicationPlay::GatherPlaybackDetailsResult CApplicationPlay::GatherPlaybackDe
     GetOptionsAndUpdateItem();
   }
 
+  // Save DynPath before disc resolution — for non-library disc items it
+  // may change from a plain .iso path to a bluray:// playlist during
+  // GetPlaylistIfDisc().  If no resume point was found in the first pass,
+  // retry with the resolved path so the bookmark lookup matches the path
+  // used by SaveFileStateJob::DoWork().
+  const std::string dynPathBeforeDisc{m_item.GetDynPath()};
+
   if (!GetPlaylistIfDisc())
     return GatherPlaybackDetailsResult::
         RESULT_NO_PLAYLIST_SELECTED; // Playlist needed but none selected (ie. user cancelled) so abort playback
+
+  if (m_item.GetStartOffset() == STARTOFFSET_RESUME && m_options.starttime == 0.0 &&
+      CUtil::UseDynPathForAddOrUpdate(m_item) &&
+      dynPathBeforeDisc != m_item.GetDynPath())
+  {
+    CVideoDatabase db;
+    if (db.Open())
+    {
+      CBookmark bookmark;
+      const std::string resolvedPath{m_item.GetDynPath()};
+      if (db.GetResumeBookMark(resolvedPath, bookmark))
+      {
+        m_options.starttime = bookmark.timeInSeconds;
+        m_options.state = bookmark.playerState;
+      }
+      db.Close();
+    }
+  }
 
   DetermineFullScreen();
 

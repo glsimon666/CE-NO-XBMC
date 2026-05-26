@@ -3372,7 +3372,13 @@ void CVideoDatabase::DeleteResumeBookMark(const CFileItem& item)
   int fileID = item.GetVideoInfoTag()->m_iFileId;
   if (fileID < 0)
   {
-    fileID = GetFileId(item.GetPath());
+    std::string path{item.GetPath()};
+    if (CUtil::UseDynPathForAddOrUpdate(item))
+      path = item.GetDynPath();
+    else if (item.HasVideoInfoTag() && !item.GetVideoInfoTag()->GetPath().empty())
+      path = item.GetVideoInfoTag()->GetPath();
+
+    fileID = GetFileId(path);
     if (fileID < 0)
       return;
   }
