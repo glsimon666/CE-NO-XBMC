@@ -2175,7 +2175,9 @@ bool CAMLCodec::OpenDecoder(CDVDStreamInfo &hints, enum ELType dovi_el_type)
         amdolby_vision_debug.Set("enable_fel 1");
         amdolby_vision_debug.Set("enable_mel 1");
       }
-      if (dovi_el_type != ELType::TYPE_MEL) // use stream path if not MEL
+      // S5 single-core uses frame-based mode for DV FEL (driver forces it)
+      if (dovi_el_type != ELType::TYPE_MEL &&
+          (aml_get_cpufamily_id() < AML_S5 || hints.dovi.dv_profile != 7))
         am_private->gcodec.dec_mode = STREAM_TYPE_STREAM;
     }
   }
