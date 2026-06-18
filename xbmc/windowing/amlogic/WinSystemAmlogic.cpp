@@ -31,6 +31,7 @@
 #include "settings/lib/Setting.h"
 #include "guilib/DispResource.h"
 #include "utils/AMLUtils.h"
+#include "utils/AMLDRMUtils.h"
 #include "utils/log.h"
 #include "threads/SingleLock.h"
 #include "DolbyVisionAML.h"
@@ -80,6 +81,12 @@ bool CWinSystemAmlogic::InitWindowSystem()
 
   CLog::Log(LOGDEBUG, "CWinSystemAmlogic::InitWindowSystem -- disabling noise reduction");
   CSysfsPath("/sys/module/di/parameters/nr2_en", 0);
+
+  // Initialize DRM device
+  if (AMLDRMUtils().IsAvailable())
+    CLog::Log(LOGINFO, "CWinSystemAmlogic::InitWindowSystem -- DRM device initialized");
+  else
+    CLog::Log(LOGWARNING, "CWinSystemAmlogic::InitWindowSystem -- DRM device not available, using FB0 fallback");
 
   if (((LINUX_VERSION_CODE >> 16) & 0xFF) < 5)
   {

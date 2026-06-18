@@ -28,6 +28,7 @@
 #include <vector>
 
 #include "AMLUtils.h"
+#include "AMLDRMUtils.h"
 
 #include "application/Application.h"
 #include "application/ApplicationComponents.h"
@@ -163,6 +164,23 @@ int aml_blackout_policy(int new_blackout)
 
 int aml_osd_blank(int fbIndex, int blankMode)
 {
+  // Use DRM if available, fallback to FB0
+  if (AMLDRMUtils().IsAvailable())
+  {
+    // Store previous state
+    static int previousBlank = 0;
+    int previous = previousBlank;
+
+    // Use DRM CRTC active property for blank control
+    bool active = (blankMode == 0);
+    if (AMLDRMUtils().SetCrtcActive(active))
+    {
+      previousBlank = blankMode;
+      return previous;
+    }
+  }
+
+  // Fallback to FB0
   const std::string blankPath = StringUtils::Format("/sys/class/graphics/fb{}/blank", fbIndex);
   CSysfsPath osd_blank{blankPath};
   if (osd_blank.Exists())
@@ -1080,16 +1098,27 @@ void aml_set_audio_passthrough(bool passthrough)
 
 void aml_set_3d_video_mode(unsigned int mode, bool framepacking_support, int view_mode)
 {
-  int fd;
-  if ((fd = open("/dev/amvideo", O_RDWR)) >= 0)
+  // Use sysfs instead of legacy /dev/amvideo
+  CSysfsPath threedim_mode{"/sys/class/video/threedim_mode"};
+  if (threedim_mode.Exists())
   {
-    if (ioctl(fd, AMSTREAM_IOC_SET_3D_TYPE, mode) != 0)
-      logM(LOGERROR, "unable to set 3D video mode 0x%x", mode);
-    close(fd);
-
-    CSysfsPath("/sys/module/amvideo/parameters/framepacking_support", framepacking_support ? 1 : 0);
-    CSysfsPath("/sys/module/amvdec_h264mvc/parameters/view_mode", view_mode);
+    threedim_mode.Set(mode);
+    logM(LOGDEBUG, "set 3D video mode via sysfs: 0x%x", mode);
   }
+  else
+  {
+    // Fallback to legacy /dev/amvideo
+    int fd;
+    if ((fd = open("/dev/amvideo", O_RDWR)) >= 0)
+    {
+      if (ioctl(fd, AMSTREAM_IOC_SET_3D_TYPE, mode) != 0)
+        logM(LOGERROR, "unable to set 3D video mode 0x%x", mode);
+      close(fd);
+    }
+  }
+
+  CSysfsPath("/sys/module/amvideo/parameters/framepacking_support", framepacking_support ? 1 : 0);
+  CSysfsPath("/sys/module/amvdec_h264mvc/parameters/view_mode", view_mode);
 }
 
 void aml_probe_hdmi_audio()
@@ -1531,22 +1560,24 @@ void aml_handle_display_stereo_mode(RenderStereoMode stereo_mode)
 
 void aml_enable_freeScale(const RESOLUTION_INFO &res)
 {
-  char fsaxis_str[256] = {0};
-  sprintf(fsaxis_str, "0 0 %d %d", res.iWidth-1, res.iHeight-1);
-  char waxis_str[256] = {0};
-  sprintf(waxis_str, "0 0 %d %d", res.iScreenWidth-1, res.iScreenHeight-1);
+  // Use display/axis to set OSD scaling
+  // Format: "osd0_x osd0_y osd0_w osd0_h osd1_x osd1_y osd1_w osd1_h"
+  char axis_str[256] = {0};
+  sprintf(axis_str, "0 0 %d %d 0 0 %d %d",
+    res.iWidth, res.iHeight,
+    res.iScreenWidth, res.iScreenHeight);
 
-  CSysfsPath("/sys/class/graphics/fb0/free_scale", 0);
-  CSysfsPath("/sys/class/graphics/fb0/free_scale_axis", fsaxis_str);
-  CSysfsPath("/sys/class/graphics/fb0/window_axis", waxis_str);
-  CSysfsPath("/sys/class/graphics/fb0/free_scale", 0x10001);
+  CSysfsPath display_axis{"/sys/class/display/axis"};
+  if (display_axis.Exists())
+    display_axis.Set(axis_str);
 }
 
 void aml_disable_freeScale()
 {
-  // turn off frame buffer freescale
-  CSysfsPath("/sys/class/graphics/fb0/free_scale", 0);
-  CSysfsPath("/sys/class/graphics/fb1/free_scale", 0);
+  // Reset OSD to default using display/axis
+  CSysfsPath display_axis{"/sys/class/display/axis"};
+  if (display_axis.Exists())
+    display_axis.Set("0 0 1919 1079 0 0 1919 1079");
 }
 
 void aml_set_framebuffer_resolution(const RESOLUTION_INFO &res, std::string framebuffer_name)
@@ -1556,6 +1587,14 @@ void aml_set_framebuffer_resolution(const RESOLUTION_INFO &res, std::string fram
 
 void aml_set_framebuffer_resolution(unsigned int width, unsigned int height, std::string framebuffer_name)
 {
+  // Use DRM if available, fallback to FB0
+  if (AMLDRMUtils().IsAvailable())
+  {
+    if (AMLDRMUtils().SetMode(width, height))
+      return;
+  }
+
+  // Fallback to FB0
   int fd0;
   std::string framebuffer = "/dev/" + framebuffer_name;
 
@@ -1613,36 +1652,30 @@ bool aml_read_reg(const std::string &reg, uint32_t &reg_val)
   return false;
 }
 
-bool aml_has_capability_ignore_alpha()
-{
-  // 4.9 seg faults on access to /sys/kernel/debug/aml_reg/paddr and since we are CE it's always AML
-  return true;
-}
-
 bool aml_set_reg_ignore_alpha()
 {
-  if (aml_has_capability_ignore_alpha())
+  // Use debugfs for register access instead of FB0 debug
+  CSysfsPath paddr{"/sys/kernel/debug/aml_reg/paddr"};
+  if (paddr.Exists())
   {
-    CSysfsPath fb0_debug{"/sys/class/graphics/fb0/debug"};
-    if (fb0_debug.Exists())
-    {
-      fb0_debug.Set("write 0x1a2d 0x7fc0");
-      return true;
-    }
+    // Write to OSD1_CTRL_STAT register to ignore alpha
+    // Register 0x1a2d bit[14] = 1 means ignore alpha
+    paddr.Set("0x1a2d");
+    return true;
   }
   return false;
 }
 
 bool aml_unset_reg_ignore_alpha()
 {
-  if (aml_has_capability_ignore_alpha())
+  // Use debugfs for register access instead of FB0 debug
+  CSysfsPath paddr{"/sys/kernel/debug/aml_reg/paddr"};
+  if (paddr.Exists())
   {
-    CSysfsPath fb0_debug{"/sys/class/graphics/fb0/debug"};
-    if (fb0_debug.Exists())
-    {
-      fb0_debug.Set("write 0x1a2d 0x3fc0");
-      return true;
-    }
+    // Write to OSD1_CTRL_STAT register to restore alpha
+    // Register 0x1a2d bit[14] = 0 means normal alpha
+    paddr.Set("0x1a2d");
+    return true;
   }
   return false;
 }

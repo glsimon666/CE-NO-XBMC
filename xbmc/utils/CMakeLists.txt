@@ -269,8 +269,10 @@ endif()
 
 if(TARGET ${APP_NAME_LC}::AML)
   list(APPEND SOURCES AMLUtils.cpp
+                      AMLDRMUtils.cpp
                       ScreenshotAML.cpp)
   list(APPEND HEADERS AMLUtils.h
+                      AMLDRMUtils.h
                       ScreenshotAML.h)
 endif()
 
