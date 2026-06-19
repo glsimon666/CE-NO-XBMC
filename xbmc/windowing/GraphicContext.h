@@ -92,6 +92,10 @@ public:
   const RESOLUTION_INFO GetResInfo(RESOLUTION res) const;
   void SetResInfo(RESOLUTION res, const RESOLUTION_INFO& info);
 
+  // Dynamic subtitle offset (percentage of screen height)
+  float GetSubtitleDynamicOffset() const { return m_subtitleDynamicOffset; }
+  void SetSubtitleDynamicOffset(float offset) { m_subtitleDynamicOffset = offset; }
+
   void Flip(bool rendered, bool videoLayer);
 
   // gfx context interface
@@ -287,4 +291,5 @@ protected:
   GuiHdr m_guiHdr{GuiHdr::SDR};
   RENDER_ORDER m_renderOrder{RENDER_ORDER_ALL_BACK_TO_FRONT};
   uint32_t m_layer{2};
+  float m_subtitleDynamicOffset{0.0f}; // dynamic subtitle offset in percentage of screen height
 };

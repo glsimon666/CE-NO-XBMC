@@ -175,16 +175,20 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
     {
       if (appPlayer->IsInMenu())
         break;
-      m_subtitleDynamicOffset -= 0.5f;
-      appPlayer->SetDynamicSubtitleOffset(m_subtitleDynamicOffset);
+      float offset = CServiceBroker::GetWinSystem()->GetGfxContext().GetSubtitleDynamicOffset();
+      offset -= 0.5f;
+      CServiceBroker::GetWinSystem()->GetGfxContext().SetSubtitleDynamicOffset(offset);
+      appPlayer->SetDynamicSubtitleOffset(offset);
       return true;
     }
   case ACTION_MOVE_DOWN:
     {
       if (appPlayer->IsInMenu())
         break;
-      m_subtitleDynamicOffset += 0.5f;
-      appPlayer->SetDynamicSubtitleOffset(m_subtitleDynamicOffset);
+      float offset = CServiceBroker::GetWinSystem()->GetGfxContext().GetSubtitleDynamicOffset();
+      offset += 0.5f;
+      CServiceBroker::GetWinSystem()->GetGfxContext().SetSubtitleDynamicOffset(offset);
+      appPlayer->SetDynamicSubtitleOffset(offset);
       return true;
     }
   default:
@@ -240,8 +244,9 @@ bool CGUIWindowFullScreen::OnMessage(CGUIMessage& message)
         float screenH = static_cast<float>(resInfo.iHeight);
         // Convert pixel offset to percentage of screen height
         // The default bottom position is at 80% of screen height
-        m_subtitleDynamicOffset = (calibratedY / screenH - 0.8f) * 100.0f;
-        appPlayer->SetDynamicSubtitleOffset(m_subtitleDynamicOffset);
+        float offset = (calibratedY / screenH - 0.8f) * 100.0f;
+        CServiceBroker::GetWinSystem()->GetGfxContext().SetSubtitleDynamicOffset(offset);
+        appPlayer->SetDynamicSubtitleOffset(offset);
       }
 
       // switch resolution

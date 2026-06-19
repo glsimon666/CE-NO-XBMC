@@ -398,26 +398,13 @@ bool CPlayerController::OnAction(const CAction &action)
         if (subAlign != SUBTITLES::Align::BOTTOM_OUTSIDE && subAlign != SUBTITLES::Align::MANUAL)
           return true;
 
-        RESOLUTION_INFO resInfo = CServiceBroker::GetWinSystem()->GetGfxContext().GetResInfo();
-        CVideoSettings vs = appPlayer->GetVideoSettings();
+        // Use dynamic offset (percentage-based, linked with video calibration)
+        float currentOffset = CServiceBroker::GetWinSystem()->GetGfxContext().GetSubtitleDynamicOffset();
+        currentOffset -= 0.5f;
+        CServiceBroker::GetWinSystem()->GetGfxContext().SetSubtitleDynamicOffset(currentOffset);
+        appPlayer->SetDynamicSubtitleOffset(currentOffset);
 
-        int maxPos = resInfo.Overscan.bottom;
-        if (subAlign == SUBTITLES::Align::BOTTOM_OUTSIDE)
-        {
-          maxPos =
-              resInfo.Overscan.bottom + static_cast<int>(static_cast<float>(resInfo.iHeight) / 100 *
-                                                         settings->GetVerticalMarginPerc());
-        }
-
-        vs.m_subtitleVerticalPosition -=
-            static_cast<int>(m_movingSpeed.GetUpdatedDistance(ACTION_SUBTITLE_VSHIFT_UP));
-        if (vs.m_subtitleVerticalPosition < resInfo.Overscan.top)
-          vs.m_subtitleVerticalPosition = resInfo.Overscan.top;
-        appPlayer->SetSubtitleVerticalPosition(vs.m_subtitleVerticalPosition,
-                                               action.GetText() == "save");
-
-        ShowSlider(action.GetID(), 277, static_cast<float>(vs.m_subtitleVerticalPosition),
-                   static_cast<float>(resInfo.Overscan.top), 1.0f, static_cast<float>(maxPos));
+        ShowSlider(action.GetID(), 277, currentOffset, -50.0f, 0.5f, 50.0f);
         return true;
       }
 
@@ -428,31 +415,13 @@ bool CPlayerController::OnAction(const CAction &action)
         if (subAlign != SUBTITLES::Align::BOTTOM_OUTSIDE && subAlign != SUBTITLES::Align::MANUAL)
           return true;
 
-        RESOLUTION_INFO resInfo = CServiceBroker::GetWinSystem()->GetGfxContext().GetResInfo();
-        CVideoSettings vs = appPlayer->GetVideoSettings();
+        // Use dynamic offset (percentage-based, linked with video calibration)
+        float currentOffset = CServiceBroker::GetWinSystem()->GetGfxContext().GetSubtitleDynamicOffset();
+        currentOffset += 0.5f;
+        CServiceBroker::GetWinSystem()->GetGfxContext().SetSubtitleDynamicOffset(currentOffset);
+        appPlayer->SetDynamicSubtitleOffset(currentOffset);
 
-        int maxPos = resInfo.Overscan.bottom;
-        if (subAlign == SUBTITLES::Align::BOTTOM_OUTSIDE)
-        {
-          // In this case the position not includes the vertical margin,
-          // so to be able to move the text to the bottom of the screen
-          // we must extend the maximum position with the vertical margin.
-          // Note that the text may go also slightly off-screen, this is
-          // caused by Libass see "displacement compensation" on OverlayRenderer
-          maxPos =
-              resInfo.Overscan.bottom + static_cast<int>(static_cast<float>(resInfo.iHeight) / 100 *
-                                                         settings->GetVerticalMarginPerc());
-        }
-
-        vs.m_subtitleVerticalPosition +=
-            static_cast<int>(m_movingSpeed.GetUpdatedDistance(ACTION_SUBTITLE_VSHIFT_DOWN));
-        if (vs.m_subtitleVerticalPosition > maxPos)
-          vs.m_subtitleVerticalPosition = maxPos;
-        appPlayer->SetSubtitleVerticalPosition(vs.m_subtitleVerticalPosition,
-                                               action.GetText() == "save");
-
-        ShowSlider(action.GetID(), 277, static_cast<float>(vs.m_subtitleVerticalPosition),
-                   static_cast<float>(resInfo.Overscan.top), 1.0f, static_cast<float>(maxPos));
+        ShowSlider(action.GetID(), 277, currentOffset, -50.0f, 0.5f, 50.0f);
         return true;
       }
 

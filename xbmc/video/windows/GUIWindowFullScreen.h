@@ -42,6 +42,4 @@ private:
   std::chrono::time_point<std::chrono::steady_clock> m_dwShowViewModeTimeout;
 
   bool m_bShowCurrentTime;
-
-  float m_subtitleDynamicOffset{0.0f}; // dynamic subtitle offset in percentage of screen height
 };
