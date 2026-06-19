@@ -232,7 +232,17 @@ bool CGUIWindowFullScreen::OnMessage(CGUIMessage& message)
       GUIINFO::CPlayerGUIInfo& guiInfo = CServiceBroker::GetGUI()->GetInfoManager().GetInfoProviders().GetPlayerInfoProvider();
       guiInfo.SetShowInfo(false);
       m_bShowCurrentTime = false;
-      m_subtitleDynamicOffset = 0.0f;
+
+      // Initialize dynamic offset from video calibration subtitle position
+      {
+        RESOLUTION_INFO resInfo = CServiceBroker::GetWinSystem()->GetGfxContext().GetResInfo();
+        float calibratedY = resInfo.iSubtitles - resInfo.Overscan.top;
+        float screenH = static_cast<float>(resInfo.iHeight);
+        // Convert pixel offset to percentage of screen height
+        // The default bottom position is at 80% of screen height
+        m_subtitleDynamicOffset = (calibratedY / screenH - 0.8f) * 100.0f;
+        appPlayer->SetDynamicSubtitleOffset(m_subtitleDynamicOffset);
+      }
 
       // switch resolution
       CServiceBroker::GetWinSystem()->GetGfxContext().SetFullScreenVideo(true);

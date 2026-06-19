@@ -319,6 +319,17 @@ void CRenderer::SetSubtitleVerticalPosition(const int value, bool save)
 void CRenderer::SetDynamicSubtitleOffset(const float value)
 {
   m_subtitleDynamicOffset.store(value, std::memory_order_relaxed);
+
+  // Update video calibration subtitle position to reflect the offset
+  RESOLUTION_INFO resInfo = CServiceBroker::GetWinSystem()->GetGfxContext().GetResInfo();
+  float screenH = static_cast<float>(resInfo.iHeight);
+  float defaultBottomY = screenH * 0.8f;
+  float newY = defaultBottomY + (screenH * value / 100.0f);
+  int newPos = static_cast<int>(newY + resInfo.Overscan.top);
+
+  // Update calibration
+  CServiceBroker::GetDisplaySettings()->GetCurrentResolutionInfo().iSubtitles = newPos;
+  CServiceBroker::GetDisplaySettings()->SetChanged();
 }
 
 void CRenderer::ResetSubtitlePosition()
