@@ -542,26 +542,24 @@ bool CDVDVideoCodecAmlogic::DualLayerConvert(uint8_t *pData, uint32_t iSize, con
 
   if (!m_packages.empty())
   {
-    auto matchingPacket =
-        VideoPlayerDualLayer::FindMatchingOppositeLayerPacket(m_packages, packet.isELPackage,
-                                                              packet.dts);
-    if (matchingPacket != m_packages.end())
-    {
-      // convert bl and el package to single package
-      DLDemuxPacket& dualLayerPacket = *matchingPacket;
+    // Simplified matching: just check if front packet is opposite layer
+    // (no DTS matching - avoids issues with seamless clip transitions where DTS wraps around)
+    DLDemuxPacket& frontPacket = m_packages.front();
 
+    if (frontPacket.isELPackage != packet.isELPackage)
+    {
       logComponentM(LOGDEBUG, LOGVIDEO, "found DT-DL {} package with dts: {:.3f} in list",
-                                        packet.isELPackage ? "BL" : "EL", dualLayerPacket.dts/DVD_TIME_BASE);
+                                        packet.isELPackage ? "BL" : "EL", frontPacket.dts/DVD_TIME_BASE);
 
       if (packet.isELPackage)
-        dual_layer_converted = m_bitstream->Convert(dualLayerPacket.buffer.GetData(), dualLayerPacket.size, pData, iSize, packet.pts);
+        dual_layer_converted = m_bitstream->Convert(frontPacket.buffer.GetData(), frontPacket.size, pData, iSize, packet.pts);
       else
-        dual_layer_converted = m_bitstream->Convert(pData, iSize, dualLayerPacket.buffer.GetData(), dualLayerPacket.size, packet.pts);
+        dual_layer_converted = m_bitstream->Convert(pData, iSize, frontPacket.buffer.GetData(), frontPacket.size, packet.pts);
 
       if (dual_layer_converted)
       {
-        RecycleDualLayerPacket(std::move(*matchingPacket));
-        m_packages.erase(matchingPacket);
+        RecycleDualLayerPacket(std::move(frontPacket));
+        m_packages.pop_front();
       }
     }
   }
@@ -574,7 +572,7 @@ bool CDVDVideoCodecAmlogic::DualLayerConvert(uint8_t *pData, uint32_t iSize, con
     queuedPacket.size = iSize;
     queuedPacket.isELPackage = packet.isELPackage;
     queuedPacket.dts = packet.dts;
-    VideoPlayerDualLayer::QueuePendingPacket(m_packages, std::move(queuedPacket), 0);
+    VideoPlayerDualLayer::QueuePendingPacket(m_packages, std::move(queuedPacket), MAX_CACHED_DUAL_LAYER_PACKETS);
 
     logComponentM(LOGDEBUG, LOGVIDEO, "did add DT-DL {} package with dts: {:.3f}, pts: {:.3f} and size {} in list",
                                       packet.isELPackage ? "EL" : "BL",
@@ -700,6 +698,14 @@ void CDVDVideoCodecAmlogic::Reset(void)
   }
   else
     m_Codec->Reset();
+
+  // Clear dual layer packet queue to prevent stale packets from accumulating
+  while (!m_packages.empty())
+  {
+    RecycleDualLayerPacket(std::move(m_packages.front()));
+    m_packages.pop_front();
+  }
+  m_freePackages.clear();
 
   ClearBitstreamCommon();
 
