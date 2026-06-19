@@ -140,6 +140,13 @@ namespace OVERLAY {
      */
     void SetDynamicSubtitleOffset(const float value);
 
+    /*!
+     * \brief Set the dynamic subtitle scale,
+     * in percentage (50 ~ 150, 100 = original size)
+     * \param value The scale percentage
+     */
+    void SetSubtitleScale(const float value);
+
   protected:
     /*!
      * \brief Reset the subtitle position to default value
@@ -214,6 +221,7 @@ namespace OVERLAY {
 
     mutable std::atomic<float> m_subtitleDynamicOffset{0.0f}; // dynamic subtitle offset in percentage of screen height
     // negative = up, positive = down
+    mutable std::atomic<float> m_subtitleScale{1.0f}; // dynamic subtitle scale (0.5 ~ 1.5, 1.0 = original)
 
     std::shared_ptr<struct KODI::SUBTITLES::STYLE::style> m_overlayStyle;
     std::atomic<bool> m_isSettingsChanged{false};

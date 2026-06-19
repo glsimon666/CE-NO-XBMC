@@ -106,6 +106,7 @@ void CRenderer::Reset()
   m_subtitlePosition = 0;
   m_subtitlePosResInfo = -1;
   m_subtitleDynamicOffset.store(0.0f, std::memory_order_relaxed);
+  m_subtitleScale.store(1.0f, std::memory_order_relaxed);
 }
 
 void CRenderer::Release(int idx)
@@ -266,6 +267,14 @@ void CRenderer::Render(COverlay* o)
   if (o->m_isDynamic)
   {
     state.y += m_rv.Height() * m_subtitleDynamicOffset.load(std::memory_order_relaxed) / 100.0f;
+
+    // Apply dynamic subtitle scale (50% ~ 150%)
+    float scale = m_subtitleScale.load(std::memory_order_relaxed);
+    if (scale != 1.0f)
+    {
+      state.width *= scale;
+      state.height *= scale;
+    }
   }
 
   o->Render(state);
@@ -330,6 +339,11 @@ void CRenderer::SetDynamicSubtitleOffset(const float value)
   // Update calibration
   CServiceBroker::GetDisplaySettings()->GetCurrentResolutionInfo().iSubtitles = newPos;
   CServiceBroker::GetDisplaySettings()->SetChanged();
+}
+
+void CRenderer::SetSubtitleScale(const float value)
+{
+  m_subtitleScale.store(std::clamp(value, 0.5f, 1.5f), std::memory_order_relaxed);
 }
 
 void CRenderer::ResetSubtitlePosition()

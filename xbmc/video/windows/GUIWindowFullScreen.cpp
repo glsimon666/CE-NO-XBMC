@@ -191,6 +191,28 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
       appPlayer->SetDynamicSubtitleOffset(offset);
       return true;
     }
+  case ACTION_MOVE_LEFT:
+    {
+      if (appPlayer->IsInMenu())
+        break;
+      // Scale down subtitles (min 50%)
+      float scale = CServiceBroker::GetWinSystem()->GetGfxContext().GetSubtitleScale();
+      scale -= 0.01f; // 1% step
+      CServiceBroker::GetWinSystem()->GetGfxContext().SetSubtitleScale(scale);
+      appPlayer->SetSubtitleScale(scale);
+      return true;
+    }
+  case ACTION_MOVE_RIGHT:
+    {
+      if (appPlayer->IsInMenu())
+        break;
+      // Scale up subtitles (max 150%)
+      float scale = CServiceBroker::GetWinSystem()->GetGfxContext().GetSubtitleScale();
+      scale += 0.01f; // 1% step
+      CServiceBroker::GetWinSystem()->GetGfxContext().SetSubtitleScale(scale);
+      appPlayer->SetSubtitleScale(scale);
+      return true;
+    }
   default:
       break;
   }

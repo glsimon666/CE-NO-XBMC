@@ -16,6 +16,7 @@
 #include "utils/StreamDetails.h"
 #include "utils/TransformMatrix.h" // for the members m_guiTransform etc.
 
+#include <algorithm>
 #include <stack>
 #include <string>
 #include <vector>
@@ -95,6 +96,10 @@ public:
   // Dynamic subtitle offset (percentage of screen height)
   float GetSubtitleDynamicOffset() const { return m_subtitleDynamicOffset; }
   void SetSubtitleDynamicOffset(float offset) { m_subtitleDynamicOffset = offset; }
+
+  // Dynamic subtitle scale (50% ~ 150%, 1.0 = original size)
+  float GetSubtitleScale() const { return m_subtitleScale; }
+  void SetSubtitleScale(float scale) { m_subtitleScale = std::clamp(scale, 0.5f, 1.5f); }
 
   void Flip(bool rendered, bool videoLayer);
 
@@ -292,4 +297,5 @@ protected:
   RENDER_ORDER m_renderOrder{RENDER_ORDER_ALL_BACK_TO_FRONT};
   uint32_t m_layer{2};
   float m_subtitleDynamicOffset{0.0f}; // dynamic subtitle offset in percentage of screen height
+  float m_subtitleScale{1.0f}; // dynamic subtitle scale (0.5 ~ 1.5)
 };

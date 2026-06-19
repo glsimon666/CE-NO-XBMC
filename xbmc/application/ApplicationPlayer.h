@@ -173,6 +173,13 @@ public:
    */
   void SetDynamicSubtitleOffset(const float value);
 
+  /*!
+   * \brief Set the dynamic subtitle scale,
+   * in percentage (50 ~ 150, 100 = original size)
+   * \param value The scale percentage
+   */
+  void SetSubtitleScale(const float value);
+
   void SetTime(int64_t time);
   void SetTotalTime(int64_t time);
   void SetVideoStream(int iStream);

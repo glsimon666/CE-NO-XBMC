@@ -142,6 +142,13 @@ public:
    */
   virtual void SetDynamicSubtitleOffset(float value) {}
 
+  /*!
+   * \brief Set the dynamic subtitle scale,
+   * in percentage (50 ~ 150, 100 = original size)
+   * \param value The scale percentage
+   */
+  virtual void SetSubtitleScale(float value) {}
+
   /** \brief Adds the subtitle(s) provided by the given file to the available player streams
   *          and actives the first of the added stream(s). E.g., vob subs can contain multiple streams.
   *   \param[in] strSubPath The full path of the subtitle file.

@@ -139,6 +139,13 @@ public:
    */
   void SetDynamicSubtitleOffset(const float value);
 
+  /*!
+   * \brief Set the dynamic subtitle scale,
+   * in percentage (50 ~ 150, 100 = original size)
+   * \param value The scale percentage
+   */
+  void SetSubtitleScale(const float value);
+
   unsigned int AllocRenderCapture();
   void ReleaseRenderCapture(unsigned int captureId);
   void StartRenderCapture(unsigned int captureId, unsigned int width, unsigned int height, int flags);
